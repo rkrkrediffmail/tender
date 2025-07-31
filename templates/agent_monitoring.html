@@ -1,0 +1,778 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Monitoring - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Agent Performance Monitoring</h1>
+                    <p class="text-muted">Real-time monitoring and analytics for AI agents</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-sync me-2"></i>Refresh
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-cog me-2"></i>Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Health Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>98.7%</h3>
+                    <p class="mb-0">System Uptime</p>
+                    <small>Last 30 days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>2.1s</h3>
+                    <p class="mb-0">Avg Response Time</p>
+                    <small>All agents</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h3>1,247</h3>
+                    <p class="mb-0">Tasks Processed</p>
+                    <small>Today</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>9/9</h3>
+                    <p class="mb-0">Agents Online</p>
+                    <small>All systems operational</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Agent Performance Grid -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tachometer-alt me-2"></i>Agent Performance Dashboard
+                        </h5>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm active">Real-time</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm">Hourly</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm">Daily</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="agent-grid">
+                        <!-- Analysis Agents Row -->
+                        <div class="agent-category">
+                            <h6 class="category-title text-primary">
+                                <i class="fas fa-search me-2"></i>Analysis Agents
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="agent-monitor analysis-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-file-text"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Document Intelligence</h6>
+                                                <small>Claude Sonnet 4 + Vision</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 94%"></div>
+                                                    </div>
+                                                    <span class="metric-number">94%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">1.8s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">287</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.2%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="docIntelChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor analysis-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-list-check"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Requirements Eng.</h6>
+                                                <small>Claude Sonnet 4 + o1</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 89%"></div>
+                                                    </div>
+                                                    <span class="metric-number">89%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-warning">3.2s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">156</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.1%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="reqEngChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor analysis-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Risk Assessment</h6>
+                                                <small>o1 Reasoning Model</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-warning" style="width: 76%"></div>
+                                                    </div>
+                                                    <span class="metric-number">76%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-danger">4.1s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">89</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-warning">1.2%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="riskChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Solution Agents Row -->
+                        <div class="agent-category">
+                            <h6 class="category-title text-success">
+                                <i class="fas fa-cogs me-2"></i>Solution Agents
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="agent-monitor solution-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-sitemap"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Solution Architecture</h6>
+                                                <small>Claude Sonnet 4 + o1</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 92%"></div>
+                                                    </div>
+                                                    <span class="metric-number">92%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">2.1s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">124</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.3%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="solutionChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor solution-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-brain"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Domain Expert</h6>
+                                                <small>Claude Sonnet 4 + RAG</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 87%"></div>
+                                                    </div>
+                                                    <span class="metric-number">87%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">1.9s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">98</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.1%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="domainChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor solution-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-calculator"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Cost Estimation</h6>
+                                                <small>Claude Sonnet 4 + o1</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 95%"></div>
+                                                    </div>
+                                                    <span class="metric-number">95%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">1.2s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">67</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.0%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="costChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Agents Row -->
+                        <div class="agent-category">
+                            <h6 class="category-title text-warning">
+                                <i class="fas fa-truck me-2"></i>Delivery Agents
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="agent-monitor delivery-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-calendar-alt"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Project Planning</h6>
+                                                <small>o1 Reasoning Model</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 85%"></div>
+                                                    </div>
+                                                    <span class="metric-number">85%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-warning">2.8s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">45</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.4%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="planningChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor delivery-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-file-alt"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Proposal Generation</h6>
+                                                <small>Claude Sonnet 4</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 91%"></div>
+                                                    </div>
+                                                    <span class="metric-number">91%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">1.6s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">78</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.2%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="proposalChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="agent-monitor delivery-agent">
+                                        <div class="agent-header">
+                                            <div class="agent-icon">
+                                                <i class="fas fa-shield-alt"></i>
+                                            </div>
+                                            <div class="agent-info">
+                                                <h6>Quality Assurance</h6>
+                                                <small>Claude Sonnet 4 + o1</small>
+                                            </div>
+                                            <div class="agent-status online">
+                                                <i class="fas fa-circle"></i>
+                                            </div>
+                                        </div>
+                                        <div class="agent-metrics">
+                                            <div class="metric-row">
+                                                <span>Efficiency</span>
+                                                <div class="metric-value">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" style="width: 88%"></div>
+                                                    </div>
+                                                    <span class="metric-number">88%</span>
+                                                </div>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Response Time</span>
+                                                <span class="metric-number text-success">2.3s</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Tasks Today</span>
+                                                <span class="metric-number">134</span>
+                                            </div>
+                                            <div class="metric-row">
+                                                <span>Error Rate</span>
+                                                <span class="metric-number text-success">0.1%</span>
+                                            </div>
+                                        </div>
+                                        <div class="agent-chart">
+                                            <canvas id="qaChart" height="60"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Analytics -->
+        <div class="col-md-4">
+            <!-- System Performance -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-server me-2"></i>System Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="systemPerformanceChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Resource Usage -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-microchip me-2"></i>Resource Usage
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="resource-metrics">
+                        <div class="resource-item">
+                            <div class="d-flex justify-content-between">
+                                <span>CPU Usage</span>
+                                <strong>34%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-primary" style="width: 34%"></div>
+                            </div>
+                        </div>
+
+                        <div class="resource-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Memory Usage</span>
+                                <strong>67%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-warning" style="width: 67%"></div>
+                            </div>
+                        </div>
+
+                        <div class="resource-item">
+                            <div class="d-flex justify-content-between">
+                                <span>API Rate Limit</span>
+                                <strong>23%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 23%"></div>
+                            </div>
+                        </div>
+
+                        <div class="resource-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Storage Usage</span>
+                                <strong>45%</strong>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" style="width: 45%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts & Notifications -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bell me-2"></i>System Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert-list">
+                        <div class="alert-item warning">
+                            <div class="alert-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="alert-content">
+                                <h6>Risk Assessment Agent Performance</h6>
+                                <small>Response time above threshold (4.1s)</small>
+                                <div class="alert-time">2 minutes ago</div>
+                            </div>
+                        </div>
+
+                        <div class="alert-item info">
+                            <div class="alert-icon">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div class="alert-content">
+                                <h6>Memory Usage Alert</h6>
+                                <small>System memory at 67% capacity</small>
+                                <div class="alert-time">15 minutes ago</div>
+                            </div>
+                        </div>
+
+                        <div class="alert-item success">
+                            <div class="alert-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="alert-content">
+                                <h6>Daily Backup Complete</h6>
+                                <small>All agent models backed up successfully</small>
+                                <div class="alert-time">1 hour ago</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Health Check -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-heartbeat me-2"></i>Health Check
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="health-checks">
+                        <div class="health-item">
+                            <div class="health-status success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="health-info">
+                                <span>API Endpoints</span>
+                                <small class="text-success">All responding</small>
+                            </div>
+                        </div>
+
+                        <div class="health-item">
+                            <div class="health-status success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="health-info">
+                                <span>Database Connections</span>
+                                <small class="text-success">Healthy</small>
+                            </div>
+                        </div>
+
+                        <div class="health-item">
+                            <div class="health-status warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="health-info">
+                                <span>Model Performance</span>
+                                <small class="text-warning">1 agent degraded</small>
+                            </div>
+                        </div>
+
+                        <div class="health-item">
+                            <div class="health-status success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="health-info">
+                                <span>Security Status</span>
+                                <small class="text-success">All secure</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // System performance chart
+    const systemCtx = document.getElementById('systemPerformanceChart').getContext('2d');
+    new Chart(systemCtx, {
+        type: 'line',
+        data: {
+            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+            datasets: [
+                {
+                    label: 'CPU %',
+                    data: [25, 28, 45, 38, 42, 35, 30],
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Memory %',
+                    data: [55, 58, 72, 68, 75, 65, 60],
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Tasks/Hour',
+                    data: [45, 38, 95, 125, 148, 87, 65],
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    max: 100
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    max: 200,
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            }
+        }
+    });
+
+    // Individual agent mini-charts
+    const agentCharts = [
+        'docIntelChart', 'reqEngChart', 'riskChart', 'solutionChart', 
+        'domainChart', 'costChart', 'planningChart', 'proposalChart', 'qaChart'
+    ];
+
+    agentCharts.forEach((chartId, index) => {
+        const ctx = document.getElementById(chartId);
+        if (ctx) {
+            new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['1h', '2h', '3h', '4h', '5h', '6h'],
+                    datasets: [{
+                        data: [
+                            Math.random() * 100,
+                            Math.random() * 100,
+                            Math.random() * 100,
+                            Math.random() * 100,
+                            Math.random() * 100,
+                            Math.random() * 100
+                        ],
+                        borderColor: index < 3 ? '#0d6efd' : index < 6 ? '#198754' : '#ffc107',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+        }
+    });
+
+    // Auto-refresh data every 30 seconds
+    setInterval(() => {
+        console.log('Refreshing agent monitoring data...');
+        // Update charts and metrics here
+    }, 30000);
+</script>
+{% endblock %}

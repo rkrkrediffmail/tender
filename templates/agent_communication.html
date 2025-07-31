@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Communication - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Agent Communication</h1>
+                    <p class="text-muted">Real-time inter-agent messaging and coordination</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-filter me-2"></i>Filter
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export Log
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Communication Feed -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-comments me-2"></i>Message Stream
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1"></i>Live
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-pause"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body communication-feed">
+                    <!-- Message Bubbles -->
+                    <div class="message-group">
+                        <div class="message orchestrator">
+                            <div class="message-header">
+                                <div class="agent-avatar master">
+                                    <i class="fas fa-crown"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Agent Orchestrator</h6>
+                                    <small class="text-muted">14:32:45</small>
+                                </div>
+                                <span class="message-type badge bg-primary">BROADCAST</span>
+                            </div>
+                            <div class="message-content">
+                                <p><strong>Initiating tender analysis workflow for Banking Modernization RFP</strong></p>
+                                <div class="message-data">
+                                    <pre class="code-block">{
+  "tender_id": "BANK_MOD_2025_001",
+  "priority": "HIGH",
+  "domain": "banking",
+  "estimated_complexity": "high",
+  "timeline_requirement": "45_days"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message analysis">
+                            <div class="message-header">
+                                <div class="agent-avatar analysis">
+                                    <i class="fas fa-file-text"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Document Intelligence Agent</h6>
+                                    <small class="text-muted">14:33:12</small>
+                                </div>
+                                <span class="message-type badge bg-info">RESPONSE</span>
+                            </div>
+                            <div class="message-content">
+                                <p>Acknowledging analysis request. Beginning document processing...</p>
+                                <div class="message-progress">
+                                    <label class="small">Processing Progress</label>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary" style="width: 45%"></div>
+                                    </div>
+                                    <small>Page 21 of 47 completed</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message analysis">
+                            <div class="message-header">
+                                <div class="agent-avatar analysis">
+                                    <i class="fas fa-file-text"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Document Intelligence Agent</h6>
+                                    <small class="text-muted">14:34:28</small>
+                                </div>
+                                <span class="message-type badge bg-success">UPDATE</span>
+                            </div>
+                            <div class="message-content">
+                                <p><strong>Document structure analysis complete</strong></p>
+                                <div class="message-results">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="result-metric">
+                                                <h5>47</h5>
+                                                <small>Pages Processed</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="result-metric">
+                                                <h5>12</h5>
+                                                <small>Tables Extracted</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="small text-muted">Forwarding structured data to Requirements Engineering Agent...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message analysis">
+                            <div class="message-header">
+                                <div class="agent-avatar analysis">
+                                    <i class="fas fa-list-check"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Requirements Engineering Agent</h6>
+                                    <small class="text-muted">14:35:15</small>
+                                </div>
+                                <span class="message-type badge bg-warning">QUERY</span>
+                            </div>
+                            <div class="message-content">
+                                <p>Received document structure. Query regarding requirement conflicts:</p>
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Conflict detected:</strong> Performance requirement specifies 1000 TPS while infrastructure constraint suggests 500 TPS maximum
+                                </div>
+                                <p class="small">Requesting clarification from Risk Assessment Agent...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message analysis">
+                            <div class="message-header">
+                                <div class="agent-avatar analysis">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Risk Assessment Agent</h6>
+                                    <small class="text-muted">14:36:03</small>
+                                </div>
+                                <span class="message-type badge bg-danger">ALERT</span>
+                            </div>
+                            <div class="message-content">
+                                <p><strong>High risk scenario identified</strong></p>
+                                <div class="risk-analysis">
+                                    <div class="risk-item">
+                                        <span class="risk-level high">HIGH</span>
+                                        <span class="risk-description">Performance gap may require infrastructure upgrade (+$2M)</span>
+                                    </div>
+                                    <div class="risk-item">
+                                        <span class="risk-level medium">MEDIUM</span>
+                                        <span class="risk-description">Timeline pressure for banking compliance</span>
+                                    </div>
+                                </div>
+                                <p class="small">Recommending phased implementation approach...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message-group">
+                        <div class="message orchestrator">
+                            <div class="message-header">
+                                <div class="agent-avatar master">
+                                    <i class="fas fa-crown"></i>
+                                </div>
+                                <div class="message-info">
+                                    <h6>Agent Orchestrator</h6>
+                                    <small class="text-muted">14:37:20</small>
+                                </div>
+                                <span class="message-type badge bg-primary">MEDIATION</span>
+                            </div>
+                            <div class="message-content">
+                                <p><strong>Consensus building initiated</strong></p>
+                                <p>Analyzing risk-performance trade-offs. Initiating Solution Architecture Agent for technical assessment...</p>
+                                <div class="consensus-status">
+                                    <div class="agent-vote">
+                                        <span class="agent-name">Requirements Engineering</span>
+                                        <span class="vote pending">Pending</span>
+                                    </div>
+                                    <div class="agent-vote">
+                                        <span class="agent-name">Risk Assessment</span>
+                                        <span class="vote pending">Pending</span>
+                                    </div>
+                                    <div class="agent-vote">
+                                        <span class="agent-name">Solution Architecture</span>
+                                        <span class="vote waiting">Waiting</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Communication Panel -->
+        <div class="col-md-4">
+            <!-- Active Agents -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users me-2"></i>Active Agents
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="agent-list">
+                        <div class="agent-item active">
+                            <div class="agent-avatar master">
+                                <i class="fas fa-crown"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h6>Orchestrator</h6>
+                                <small class="text-success">
+                                    <i class="fas fa-circle me-1"></i>Coordinating
+                                </small>
+                            </div>
+                            <div class="message-count">
+                                <span class="badge bg-primary">3</span>
+                            </div>
+                        </div>
+
+                        <div class="agent-item active">
+                            <div class="agent-avatar analysis">
+                                <i class="fas fa-file-text"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h6>Document Intelligence</h6>
+                                <small class="text-success">
+                                    <i class="fas fa-circle me-1"></i>Processing
+                                </small>
+                            </div>
+                            <div class="message-count">
+                                <span class="badge bg-info">2</span>
+                            </div>
+                        </div>
+
+                        <div class="agent-item active">
+                            <div class="agent-avatar analysis">
+                                <i class="fas fa-list-check"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h6>Requirements Eng.</h6>
+                                <small class="text-warning">
+                                    <i class="fas fa-circle me-1"></i>Querying
+                                </small>
+                            </div>
+                            <div class="message-count">
+                                <span class="badge bg-warning">1</span>
+                            </div>
+                        </div>
+
+                        <div class="agent-item active">
+                            <div class="agent-avatar analysis">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h6>Risk Assessment</h6>
+                                <small class="text-danger">
+                                    <i class="fas fa-circle me-1"></i>Alert
+                                </small>
+                            </div>
+                            <div class="message-count">
+                                <span class="badge bg-danger">1</span>
+                            </div>
+                        </div>
+
+                        <div class="agent-item inactive">
+                            <div class="agent-avatar solution">
+                                <i class="fas fa-sitemap"></i>
+                            </div>
+                            <div class="agent-info">
+                                <h6>Solution Architecture</h6>
+                                <small class="text-muted">
+                                    <i class="fas fa-circle me-1"></i>Waiting
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Statistics -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Communication Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Total Messages</span>
+                            <strong>23</strong>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Active Conversations</span>
+                            <strong>4</strong>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Pending Queries</span>
+                            <strong>2</strong>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Consensus Items</span>
+                            <strong>1</strong>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Response Time</span>
+                            <strong class="text-success">2.3s</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Filters -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter me-2"></i>Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" checked>
+                        <label class="form-check-label">Orchestrator Messages</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" checked>
+                        <label class="form-check-label">Analysis Agents</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" checked>
+                        <label class="form-check-label">Solution Agents</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" checked>
+                        <label class="form-check-label">Delivery Agents</label>
+                    </div>
+                    <hr>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" checked>
+                        <label class="form-check-label">Alerts & Errors</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox">
+                        <label class="form-check-label">Debug Messages</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-scroll to latest messages
+    const communicationFeed = document.querySelector('.communication-feed');
+    
+    function scrollToBottom() {
+        communicationFeed.scrollTop = communicationFeed.scrollHeight;
+    }
+    
+    // Simulate new messages
+    setInterval(() => {
+        // Add new message bubbles dynamically
+        console.log('Checking for new messages...');
+    }, 3000);
+    
+    // Initial scroll
+    scrollToBottom();
+</script>
+{% endblock %}

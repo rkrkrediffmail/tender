@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Multi-Agent Dashboard</h1>
+                    <p class="text-muted">AI-Powered Tender Analysis & Proposal Generation System</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Analysis
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-refresh me-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">9</h4>
+                            <p class="card-text">Active Agents</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-robot fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">12</h4>
+                            <p class="card-text">Active Projects</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-folder-open fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">3</h4>
+                            <p class="card-text">Pending Reviews</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">98%</h4>
+                            <p class="card-text">System Health</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-heartbeat fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Ecosystem Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-sitemap me-2"></i>Agent Ecosystem
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Analysis Agents -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-search me-2"></i>ANALYSIS AGENTS
+                            </h6>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card analysis-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-file-text"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Document Intelligence</h6>
+                                <p class="small">Claude Sonnet 4 + Vision</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary" style="width: 85%"></div>
+                                    </div>
+                                    <small>85% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card analysis-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-list-check"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Requirements Engineering</h6>
+                                <p class="small">Claude Sonnet 4 + o1</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary" style="width: 92%"></div>
+                                    </div>
+                                    <small>92% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card analysis-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Risk Assessment</h6>
+                                <p class="small">o1 Reasoning Model</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary" style="width: 78%"></div>
+                                    </div>
+                                    <small>78% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Solution Agents -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-success mb-3">
+                                <i class="fas fa-cogs me-2"></i>SOLUTION AGENTS
+                            </h6>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card solution-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-sitemap"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Solution Architecture</h6>
+                                <p class="small">Claude Sonnet 4 + o1</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" style="width: 90%"></div>
+                                    </div>
+                                    <small>90% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card solution-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-brain"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Domain Expert</h6>
+                                <p class="small">Claude Sonnet 4 + RAG</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" style="width: 88%"></div>
+                                    </div>
+                                    <small>88% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card solution-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-calculator"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Cost Estimation</h6>
+                                <p class="small">Claude Sonnet 4 + o1</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" style="width: 95%"></div>
+                                    </div>
+                                    <small>95% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Agents -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-warning mb-3">
+                                <i class="fas fa-truck me-2"></i>DELIVERY AGENTS
+                            </h6>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card delivery-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Project Planning</h6>
+                                <p class="small">o1 Reasoning Model</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-warning" style="width: 87%"></div>
+                                    </div>
+                                    <small>87% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card delivery-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Proposal Generation</h6>
+                                <p class="small">Claude Sonnet 4</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-warning" style="width: 93%"></div>
+                                    </div>
+                                    <small>93% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="agent-card delivery-agent">
+                                <div class="agent-header">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <span class="agent-status online"></span>
+                                </div>
+                                <h6>Quality Assurance</h6>
+                                <p class="small">Claude Sonnet 4 + o1</p>
+                                <div class="agent-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-warning" style="width: 91%"></div>
+                                    </div>
+                                    <small>91% Efficiency</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity and System Performance -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="activity-item">
+                        <div class="activity-icon bg-primary">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>New tender document uploaded</h6>
+                            <p class="text-muted small">Banking modernization project - 2 minutes ago</p>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon bg-success">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>Requirements analysis completed</h6>
+                            <p class="text-muted small">Healthcare management system - 15 minutes ago</p>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon bg-warning">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>Risk assessment flagged high complexity</h6>
+                            <p class="text-muted small">E-commerce platform - 1 hour ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>System Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="performanceChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Performance Chart
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Analysis', 'Solution', 'Delivery'],
+            datasets: [{
+                data: [85, 91, 90],
+                backgroundColor: [
+                    '#0d6efd',
+                    '#198754',
+                    '#ffc107'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
