@@ -101,7 +101,7 @@ def create_sample_project():
             description='AI-powered digital lending platform for Saudi Home Loans',
             rfp_title='Request for Proposal - Digital Lending Platform',
             client_name='Saudi Home Loans (SHL)',
-            estimated_value=2500000.0,
+            estimated_value=250000.0,
             currency='USD',
             status='active',
             priority='high',
