@@ -1,7 +1,7 @@
 """Health check module for Azure App Service"""
 from flask import jsonify
 import os
-import psycopg2
+import psycopg
 from datetime import datetime
 
 def register_health_routes(app):

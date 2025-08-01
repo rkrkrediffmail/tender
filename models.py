@@ -12,6 +12,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 class User(db.Model):
+    __tablename__ = 'users'  # Add this line
     """User management and authentication"""
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
