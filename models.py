@@ -1,102 +1,106 @@
+# models.py - Complete Implementation
 from datetime import datetime
-from app import db
-from sqlalchemy import JSON
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import JSON, Text, String, Integer, DateTime, Boolean, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, relationship
+from werkzeug.security import generate_password_hash, check_password_hash
+import uuid
 
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
+
+class User(db.Model):
+    """User management and authentication"""
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    full_name = db.Column(db.String(255))
+    role = db.Column(db.String(50), default='user')  # admin, manager, user
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+
+    # Relationships
+    projects = db.relationship('Project', backref='owner', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Project(db.Model):
-    """Main project/tender entity"""
+    """Tender/RFP projects"""
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
-    status = db.Column(db.String(50), default='active')  # active, completed, paused
+    rfp_title = db.Column(db.String(500))
     client_name = db.Column(db.String(255))
     submission_deadline = db.Column(db.DateTime)
-    estimated_value = db.Column(db.Numeric(15, 2))
+    estimated_value = db.Column(db.Float)
+    currency = db.Column(db.String(10), default='USD')
+    status = db.Column(db.String(50), default='active')  # active, completed, cancelled, submitted
+    priority = db.Column(db.String(20), default='medium')  # high, medium, low
+    completion_percentage = db.Column(db.Integer, default=0)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     documents = db.relationship('Document', backref='project', lazy=True, cascade='all, delete-orphan')
     requirements = db.relationship('Requirement', backref='project', lazy=True, cascade='all, delete-orphan')
-    agent_tasks = db.relationship('AgentTask', backref='project', lazy=True, cascade='all, delete-orphan')
-    proposals = db.relationship('Proposal', backref='project', lazy=True, cascade='all, delete-orphan')
+    tasks = db.relationship('AgentTask', backref='project', lazy=True, cascade='all, delete-orphan')
 
-    def __repr__(self):
-        return f'<Project {self.name}>'
+class Agent(db.Model):
+    """AI Agents in the system"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    agent_type = db.Column(db.String(100), nullable=False)  # orchestrator, analysis, solution, delivery
+    description = db.Column(db.Text)
+    model_name = db.Column(db.String(100))  # claude-sonnet-4, gpt-4, etc.
+    status = db.Column(db.String(50), default='offline')  # online, offline, busy, error
+    specialties = db.Column(JSON)  # List of specialties
+    performance_metrics = db.Column(JSON)  # Performance data
+    configuration = db.Column(JSON)  # Agent-specific config
+    system_prompt = db.Column(db.Text)  # AI system prompt
+    max_tokens = db.Column(db.Integer, default=4000)
+    temperature = db.Column(db.Float, default=0.3)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
+    tasks = db.relationship('AgentTask', backref='agent', lazy=True)
+    sent_messages = db.relationship('AgentMessage', foreign_keys='AgentMessage.agent_id', backref='sender', lazy=True)
 
 class Document(db.Model):
     """Uploaded tender documents"""
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(500))
+    file_path = db.Column(db.String(500), nullable=False)
     file_size = db.Column(db.Integer)
-    file_type = db.Column(db.String(50))
-    upload_status = db.Column(db.String(50), default='uploaded')  # uploaded, processing, analyzed, error
-    analysis_status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed, failed
+    mime_type = db.Column(db.String(100))
+    file_hash = db.Column(db.String(64))  # SHA-256 hash
+    document_type = db.Column(db.String(100))  # rfp, technical_spec, legal, financial
+    processing_status = db.Column(db.String(50), default='uploaded')  # uploaded, processing, completed, failed
     extracted_text = db.Column(db.Text)
-    document_metadata = db.Column(JSON)  # Store extracted metadata as JSON
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    def __repr__(self):
-        return f'<Document {self.original_filename}>'
-
-
-class Agent(db.Model):
-    """AI Agent definitions and status"""
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    agent_type = db.Column(db.String(50), nullable=False)  # analysis, solution, delivery, orchestrator
-    description = db.Column(db.Text)
-    model_name = db.Column(db.String(100))  # claude-sonnet-4, o1-reasoning, etc.
-    status = db.Column(db.String(50), default='online')  # online, offline, processing, error
-    specialties = db.Column(JSON)  # List of specialties
-    performance_metrics = db.Column(JSON)  # Store performance data
-    config = db.Column(JSON)  # Agent-specific configuration
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    tasks = db.relationship('AgentTask', backref='agent', lazy=True)
-    sent_messages = db.relationship('AgentMessage', foreign_keys='AgentMessage.agent_id', backref='sender_agent', lazy=True)
-    received_messages = db.relationship('AgentMessage', foreign_keys='AgentMessage.recipient_agent_id', backref='recipient_agent', lazy=True)
-
-    def __repr__(self):
-        return f'<Agent {self.name}>'
-
-
-class AgentTask(db.Model):
-    """Tasks assigned to agents"""
-    id = db.Column(db.Integer, primary_key=True)
+    extracted_metadata = db.Column(JSON)
+    page_count = db.Column(db.Integer)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False)
-    task_type = db.Column(db.String(100), nullable=False)  # document_analysis, risk_assessment, etc.
-    priority = db.Column(db.String(20), default='medium')  # high, medium, low
-    status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed, failed
-    input_data = db.Column(JSON)  # Task input parameters
-    output_data = db.Column(JSON)  # Task results
-    progress_percentage = db.Column(db.Integer, default=0)
-    estimated_duration = db.Column(db.Integer)  # in minutes
-    actual_duration = db.Column(db.Integer)  # in minutes
-    error_message = db.Column(db.Text)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    started_at = db.Column(db.DateTime)
-    completed_at = db.Column(db.DateTime)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<AgentTask {self.task_type} - {self.status}>'
-
+    # Relationships
+    requirements = db.relationship('Requirement', backref='source_document', lazy=True)
 
 class Requirement(db.Model):
-    """Extracted and analyzed requirements"""
+    """Extracted requirements from documents"""
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    requirement_id = db.Column(db.String(50))  # REQ-001, REQ-002, etc.
-    title = db.Column(db.String(255), nullable=False)
+    requirement_id = db.Column(db.String(50), nullable=False)  # REQ-001, etc.
+    title = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text, nullable=False)
     requirement_type = db.Column(db.String(50))  # functional, non_functional, business, technical
     priority = db.Column(db.String(20))  # must_have, should_have, could_have, wont_have
@@ -108,94 +112,101 @@ class Requirement(db.Model):
     conflicts_with = db.Column(JSON)  # List of conflicting requirement IDs
     dependencies = db.Column(JSON)  # List of dependent requirement IDs
     acceptance_criteria = db.Column(JSON)  # List of acceptance criteria
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationship
-    source_document = db.relationship('Document', backref='extracted_requirements')
+class AgentTask(db.Model):
+    """Tasks assigned to agents"""
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    task_type = db.Column(db.String(100), nullable=False)  # document_analysis, requirement_extraction, etc.
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed, failed, cancelled
+    priority = db.Column(db.String(20), default='medium')  # high, medium, low
+    progress_percentage = db.Column(db.Integer, default=0)
+    input_data = db.Column(JSON)  # Task input parameters
+    output_data = db.Column(JSON)  # Task results
+    error_message = db.Column(db.Text)
+    estimated_duration = db.Column(db.Integer)  # in minutes
+    actual_duration = db.Column(db.Integer)  # in minutes
+    agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    parent_task_id = db.Column(db.Integer, db.ForeignKey('agent_task.id'))  # For subtasks
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<Requirement {self.requirement_id}: {self.title}>'
-
+    # Relationships
+    subtasks = db.relationship('AgentTask', remote_side=[id], backref='parent_task')
 
 class AgentMessage(db.Model):
-    """Inter-agent communication messages"""
+    """Inter-agent communication"""
     id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'), nullable=False)
     recipient_agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'))  # None for broadcast
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
+    conversation_id = db.Column(db.String(100))  # For grouping related messages
     message_type = db.Column(db.String(50), nullable=False)  # REQUEST, RESPONSE, NOTIFICATION, QUERY
     priority = db.Column(db.String(20), default='medium')  # high, medium, low
-    subject = db.Column(db.String(255))
+    subject = db.Column(db.String(500))
     content = db.Column(db.Text, nullable=False)
     payload = db.Column(JSON)  # Additional structured data
-    conversation_id = db.Column(db.String(100))  # For grouping related messages
     response_to_id = db.Column(db.Integer, db.ForeignKey('agent_message.id'))  # For threading
     status = db.Column(db.String(50), default='sent')  # sent, delivered, read, processed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     read_at = db.Column(db.DateTime)
     processed_at = db.Column(db.DateTime)
 
-    # Relationships  
+    # Relationships
+    recipient = db.relationship('Agent', foreign_keys=[recipient_agent_id])
     response_to = db.relationship('AgentMessage', remote_side=[id], backref='responses')
-
-    def __repr__(self):
-        return f'<AgentMessage {self.message_type}: {self.subject}>'
-
 
 class Proposal(db.Model):
     """Generated proposals"""
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    version = db.Column(db.String(20), default='1.0')
-    title = db.Column(db.String(255), nullable=False)
-    status = db.Column(db.String(50), default='draft')  # draft, review, final, submitted
-    content = db.Column(db.Text)  # Main proposal content
+    version = db.Column(db.String(20), nullable=False)  # 1.0, 1.1, 2.0
+    title = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(50), default='draft')  # draft, review, approved, submitted
+    content_sections = db.Column(JSON)  # Structured proposal content
+    generated_content = db.Column(db.Text)  # Full generated text
     executive_summary = db.Column(db.Text)
     technical_approach = db.Column(db.Text)
-    project_timeline = db.Column(JSON)  # Timeline data
-    cost_breakdown = db.Column(JSON)  # Cost analysis
-    risk_assessment = db.Column(JSON)  # Risk analysis
-    quality_score = db.Column(db.Float)  # Overall quality score (0-100)
-    proposal_metadata = db.Column(JSON)  # Additional proposal metadata
-    file_path = db.Column(db.String(500))  # Generated document path
-    created_by_agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'))
+    project_timeline = db.Column(JSON)
+    cost_breakdown = db.Column(JSON)
+    team_composition = db.Column(JSON)
+    risk_assessment = db.Column(JSON)
+    file_path = db.Column(db.String(500))  # Path to generated PDF/Word file
+    word_count = db.Column(db.Integer)
+    confidence_score = db.Column(db.Float)  # AI confidence in proposal quality
+    created_by_agent = db.Column(db.Integer, db.ForeignKey('agent.id'))
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationship
-    created_by_agent = db.relationship('Agent', backref='proposals')
-
-    def __repr__(self):
-        return f'<Proposal {self.title} v{self.version}>'
-
+    # Relationships
+    project = db.relationship('Project', backref='proposals')
 
 class SystemLog(db.Model):
-    """System activity and audit logs"""
+    """System logs and audit trail"""
     id = db.Column(db.Integer, primary_key=True)
-    level = db.Column(db.String(20), nullable=False)  # INFO, WARNING, ERROR, DEBUG
-    source = db.Column(db.String(100))  # agent name, system component, etc.
-    event_type = db.Column(db.String(100))  # task_started, document_uploaded, etc.
+    log_level = db.Column(db.String(20), nullable=False)  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    component = db.Column(db.String(100), nullable=False)  # agent_name, system, api, etc.
+    event_type = db.Column(db.String(100), nullable=False)  # task_started, document_processed, error_occurred
     message = db.Column(db.Text, nullable=False)
-    log_details = db.Column(JSON)  # Additional structured log data
+    details = db.Column(JSON)  # Additional structured data
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
     agent_id = db.Column(db.Integer, db.ForeignKey('agent.id'))
-    user_id = db.Column(db.String(100))  # For future user management
+    task_id = db.Column(db.String(100))  # Reference to AgentTask
+    ip_address = db.Column(db.String(45))  # Support IPv6
+    user_agent = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<SystemLog {self.level}: {self.event_type}>'
-
-
-class ProjectMetrics(db.Model):
-    """Project performance and analytics"""
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    metric_name = db.Column(db.String(100), nullable=False)
-    metric_value = db.Column(db.Float)
-    metric_unit = db.Column(db.String(50))
-    measurement_date = db.Column(db.DateTime, default=datetime.utcnow)
-    metric_metadata = db.Column(JSON)  # Additional metric context
-
-    def __repr__(self):
-        return f'<ProjectMetrics {self.metric_name}: {self.metric_value}>'
+    # Relationships
+    user = db.relationship('User', backref='logs')
+    agent = db.relationship('Agent', backref='logs')

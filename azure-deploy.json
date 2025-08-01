@@ -1,0 +1,17 @@
+{
+  "name": "tender-analysis-system",
+  "runtime": "python|3.11",
+  "startup_command": "gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 main:app",
+  "environment_variables": {
+    "FLASK_ENV": "production",
+    "PORT": "8000",
+    "PYTHONPATH": "/home/site/wwwroot"
+  },
+  "required_azure_services": [
+    "App Service (Linux, Python 3.11)",
+    "Azure Database for PostgreSQL",
+    "Azure Storage Account",
+    "Azure Redis Cache (optional)",
+    "Application Insights (optional)"
+  ]
+}

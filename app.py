@@ -1,159 +1,367 @@
+# app.py - Enhanced with file processing and API endpoints
 import os
-import logging
+import uuid
+import hashlib
+import mimetypes
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Import enhanced models and agents
+from models import *
+from agents.document_intelligence import DocumentIntelligenceAgent
+from agents.requirements_engineering import RequirementsEngineeringAgent
 
-class Base(DeclarativeBase):
-    pass
+# Configure file uploads
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'}
 
-db = SQLAlchemy(model_class=Base)
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
-# Create the app
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
-# Configure the database
-database_url = os.environ.get("DATABASE_URL")
-if not database_url:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+def calculate_file_hash(file_path):
+    """Calculate SHA-256 hash of file"""
+    hash_sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_sha256.update(chunk)
+    return hash_sha256.hexdigest()
 
-# Initialize the app with the extension
-db.init_app(app)
+# Authentication routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
 
-@app.route('/')
-def dashboard():
-    """Main dashboard with agent ecosystem overview"""
-    # Get real data from database
-    agents = db.session.query(Agent).all()
-    projects = db.session.query(Project).filter_by(status='active').all()
-    recent_tasks = db.session.query(AgentTask).order_by(AgentTask.updated_at.desc()).limit(5).all()
-    
-    # Calculate some metrics
-    total_agents = len(agents)
-    active_agents = len([a for a in agents if a.status == 'online'])
-    total_projects = len(projects)
-    
-    return render_template('dashboard.html', 
-                         agents=agents, 
-                         projects=projects,
-                         recent_tasks=recent_tasks,
-                         total_agents=total_agents,
-                         active_agents=active_agents,
-                         total_projects=total_projects)
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            login_user(user)
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password')
 
-@app.route('/document-upload')
-def document_upload():
-    """Document upload and analysis interface"""
-    projects = db.session.query(Project).filter_by(status='active').all()
-    documents = db.session.query(Document).order_by(Document.created_at.desc()).limit(10).all()
-    return render_template('document_upload.html', projects=projects, documents=documents)
+    return render_template('login.html')
 
-@app.route('/agent-workflow')
-def agent_workflow():
-    """Multi-agent workflow visualization"""
-    return render_template('agent_workflow.html')
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
-@app.route('/agent-communication')
-def agent_communication():
-    """Real-time agent communication display"""
-    messages = db.session.query(AgentMessage).order_by(AgentMessage.created_at.desc()).limit(20).all()
-    agents = db.session.query(Agent).all()
-    return render_template('agent_communication.html', messages=messages, agents=agents)
+# Enhanced file upload endpoint
+@app.route('/api/upload', methods=['POST'])
+@login_required
+def upload_files():
+    """Handle file uploads with processing"""
 
-@app.route('/requirements-analysis')
-def requirements_analysis():
-    """Requirements analysis screens"""
-    requirements = db.session.query(Requirement).order_by(Requirement.priority, Requirement.requirement_id).all()
-    projects = db.session.query(Project).filter_by(status='active').all()
-    return render_template('requirements_analysis.html', requirements=requirements, projects=projects)
+    if 'files' not in request.files:
+        return jsonify({'error': 'No files provided'}), 400
 
-@app.route('/solution-architecture')
-def solution_architecture():
-    """Solution architecture presentation"""
-    agents = db.session.query(Agent).filter_by(agent_type='solution').all()
-    projects = db.session.query(Project).filter_by(status='active').all()
-    return render_template('solution_architecture.html', agents=agents, projects=projects)
+    files = request.files.getlist('files')
+    project_id = request.form.get('project_id')
 
-@app.route('/project-planning')
-def project_planning():
-    """Project planning timeline view"""
-    projects = db.session.query(Project).filter_by(status='active').all()
-    tasks = db.session.query(AgentTask).order_by(AgentTask.created_at.desc()).limit(15).all()
-    return render_template('project_planning.html', projects=projects, tasks=tasks)
+    if not project_id:
+        return jsonify({'error': 'Project ID required'}), 400
 
-@app.route('/proposal-generation')
-def proposal_generation():
-    """Proposal generation interface"""
-    proposals = db.session.query(Proposal).order_by(Proposal.created_at.desc()).all()
-    projects = db.session.query(Project).filter_by(status='active').all()
-    return render_template('proposal_generation.html', proposals=proposals, projects=projects)
+    # Verify project exists and user has access
+    project = Project.query.filter_by(id=project_id, user_id=current_user.id).first()
+    if not project:
+        return jsonify({'error': 'Project not found or access denied'}), 404
 
-@app.route('/quality-assurance')
-def quality_assurance():
-    """Quality assurance dashboard"""
-    agents = db.session.query(Agent).all()
-    tasks = db.session.query(AgentTask).filter(AgentTask.status.in_(['completed', 'failed'])).order_by(AgentTask.completed_at.desc()).limit(10).all()
-    return render_template('quality_assurance.html', agents=agents, tasks=tasks)
+    uploaded_files = []
 
-@app.route('/agent-monitoring')
-def agent_monitoring():
-    """Agent performance monitoring"""
-    agents = db.session.query(Agent).all()
-    recent_logs = db.session.query(SystemLog).order_by(SystemLog.created_at.desc()).limit(20).all()
-    return render_template('agent_monitoring.html', agents=agents, recent_logs=recent_logs)
+    for file in files:
+        if file and file.filename and allowed_file(file.filename):
+            # Generate unique filename
+            filename = str(uuid.uuid4()) + '_' + secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/api/agents/status')
-def api_agents_status():
-    """API endpoint for real-time agent status updates"""
-    agents = db.session.query(Agent).all()
-    agent_data = []
-    for agent in agents:
-        agent_data.append({
-            'id': agent.id,
-            'name': agent.name,
-            'type': agent.agent_type,
-            'status': agent.status,
-            'performance_metrics': agent.performance_metrics or {},
-            'last_updated': agent.updated_at.isoformat() if agent.updated_at else None
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+            # Save file
+            file.save(file_path)
+
+            # Calculate file hash and get metadata
+            file_hash = calculate_file_hash(file_path)
+            file_size = os.path.getsize(file_path)
+            mime_type = mimetypes.guess_type(file_path)[0]
+
+            # Save to database
+            document = Document(
+                filename=filename,
+                original_filename=file.filename,
+                file_path=file_path,
+                file_size=file_size,
+                mime_type=mime_type,
+                file_hash=file_hash,
+                project_id=project_id,
+                uploaded_by=current_user.id,
+                processing_status='uploaded'
+            )
+
+            db.session.add(document)
+            db.session.commit()
+
+            # Create document analysis task
+            doc_agent = Agent.query.filter_by(name='Document Intelligence').first()
+            if doc_agent:
+                analysis_task = AgentTask(
+                    task_type='document_analysis',
+                    title=f'Analyze {file.filename}',
+                    description=f'Extract and analyze content from {file.filename}',
+                    agent_id=doc_agent.id,
+                    project_id=project_id,
+                    input_data={'document_id': document.id},
+                    status='pending'
+                )
+                db.session.add(analysis_task)
+                db.session.commit()
+
+            uploaded_files.append({
+                'id': document.id,
+                'filename': file.filename,
+                'size': file_size,
+                'status': 'uploaded',
+                'task_id': analysis_task.task_id if doc_agent else None
+            })
+
+    return jsonify({
+        'message': f'Successfully uploaded {len(uploaded_files)} files',
+        'files': uploaded_files
+    })
+
+# Enhanced project management
+@app.route('/api/projects', methods=['GET', 'POST'])
+@login_required
+def manage_projects():
+    """Get user projects or create new project"""
+
+    if request.method == 'POST':
+        data = request.get_json()
+
+        project = Project(
+            name=data['name'],
+            description=data.get('description', ''),
+            rfp_title=data.get('rfp_title', ''),
+            client_name=data.get('client_name', ''),
+            estimated_value=data.get('estimated_value'),
+            currency=data.get('currency', 'USD'),
+            priority=data.get('priority', 'medium'),
+            user_id=current_user.id
+        )
+
+        db.session.add(project)
+        db.session.commit()
+
+        return jsonify({
+            'id': project.id,
+            'name': project.name,
+            'status': project.status,
+            'created_at': project.created_at.isoformat()
         })
-    return jsonify({'agents': agent_data, 'timestamp': datetime.utcnow().isoformat()})
 
-@app.route('/api/tasks/recent')
-def api_recent_tasks():
-    """API endpoint for recent task updates"""
-    tasks = db.session.query(AgentTask).order_by(AgentTask.updated_at.desc()).limit(10).all()
-    task_data = []
-    for task in tasks:
-        task_data.append({
-            'id': task.id,
-            'type': task.task_type,
-            'status': task.status,
-            'progress': task.progress_percentage,
-            'agent_name': task.agent.name if task.agent else 'Unknown',
-            'project_name': task.project.name if task.project else 'Unknown',
-            'updated_at': task.updated_at.isoformat() if task.updated_at else None
+    else:
+        projects = Project.query.filter_by(user_id=current_user.id).all()
+        return jsonify([{
+            'id': p.id,
+            'name': p.name,
+            'description': p.description,
+            'status': p.status,
+            'priority': p.priority,
+            'completion_percentage': p.completion_percentage,
+            'created_at': p.created_at.isoformat()
+        } for p in projects])
+
+# Task management and processing
+@app.route('/api/tasks/create', methods=['POST'])
+@login_required
+def create_task():
+    """Create new agent task"""
+
+    data = request.get_json()
+
+    # Verify agent exists
+    agent = Agent.query.get(data['agent_id'])
+    if not agent:
+        return jsonify({'error': 'Agent not found'}), 404
+
+    # Verify project access
+    project = Project.query.filter_by(id=data['project_id'], user_id=current_user.id).first()
+    if not project:
+        return jsonify({'error': 'Project not found or access denied'}), 404
+
+    task = AgentTask(
+        task_type=data['task_type'],
+        title=data['title'],
+        description=data.get('description', ''),
+        priority=data.get('priority', 'medium'),
+        input_data=data.get('input_data', {}),
+        agent_id=data['agent_id'],
+        project_id=data['project_id'],
+        status='pending'
+    )
+
+    db.session.add(task)
+    db.session.commit()
+
+    return jsonify({
+        'task_id': task.task_id,
+        'status': task.status,
+        'created_at': task.created_at.isoformat()
+    })
+
+@app.route('/api/tasks/<task_id>/process', methods=['POST'])
+@login_required
+def process_task(task_id):
+    """Process a specific task"""
+
+    task = AgentTask.query.filter_by(task_id=task_id).first()
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    # Verify user has access to the project
+    if task.project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        # Initialize appropriate agent based on task type
+        if task.agent.name == 'Document Intelligence':
+            agent = DocumentIntelligenceAgent(task.agent_id)
+        elif task.agent.name == 'Requirements Engineering':
+            agent = RequirementsEngineeringAgent(task.agent_id)
+        else:
+            return jsonify({'error': f'Agent {task.agent.name} not implemented yet'}), 501
+
+        # Process task asynchronously (in a real app, use Celery or similar)
+        import asyncio
+        result = asyncio.run(agent.process_task(task_id))
+
+        return jsonify({
+            'task_id': task_id,
+            'status': 'completed',
+            'result': result
         })
-    return jsonify({'tasks': task_data})
 
-# Import models to ensure they're registered with the app
-from models import Agent, Project, Document, Requirement, AgentTask, AgentMessage, SystemLog, Proposal, ProjectMetrics
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# Create database tables
-with app.app_context():
-    db.create_all()
-    logging.info("Database tables created successfully")
+# Requirements management
+@app.route('/api/projects/<int:project_id>/requirements', methods=['GET'])
+@login_required
+def get_requirements(project_id):
+    """Get requirements for a project"""
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    project = Project.query.filter_by(id=project_id, user_id=current_user.id).first()
+    if not project:
+        return jsonify({'error': 'Project not found or access denied'}), 404
+
+    requirements = Requirement.query.filter_by(project_id=project_id).all()
+
+    return jsonify([{
+        'id': req.id,
+        'requirement_id': req.requirement_id,
+        'title': req.title,
+        'description': req.description,
+        'type': req.requirement_type,
+        'priority': req.priority,
+        'complexity': req.complexity,
+        'status': req.status,
+        'estimated_effort': req.estimated_effort,
+        'dependencies': req.dependencies,
+        'conflicts_with': req.conflicts_with,
+        'acceptance_criteria': req.acceptance_criteria
+    } for req in requirements])
+
+@app.route('/api/projects/<int:project_id>/extract-requirements', methods=['POST'])
+@login_required
+def extract_requirements(project_id):
+    """Extract requirements from project documents"""
+
+    project = Project.query.filter_by(id=project_id, user_id=current_user.id).first()
+    if not project:
+        return jsonify({'error': 'Project not found or access denied'}), 404
+
+    # Get requirements engineering agent
+    req_agent = Agent.query.filter_by(name='Requirements Engineering').first()
+    if not req_agent:
+        return jsonify({'error': 'Requirements Engineering agent not found'}), 500
+
+    # Create extraction task
+    task = AgentTask(
+        task_type='requirement_extraction',
+        title=f'Extract requirements for {project.name}',
+        description='Extract and analyze requirements from project documents',
+        agent_id=req_agent.id,
+        project_id=project_id,
+        input_data={'project_id': project_id},
+        status='pending'
+    )
+
+    db.session.add(task)
+    db.session.commit()
+
+    return jsonify({
+        'task_id': task.task_id,
+        'message': 'Requirements extraction task created',
+        'status': 'pending'
+    })
+
+# Document download endpoint
+@app.route('/api/documents/<int:document_id>/download')
+@login_required
+def download_document(document_id):
+    """Download uploaded document"""
+
+    document = Document.query.get(document_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Verify user has access
+    if document.project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    return send_file(document.file_path, as_attachment=True,
+                     download_name=document.original_filename)
+
+# System monitoring endpoints
+@app.route('/api/system/status')
+@login_required
+def system_status():
+    """Get overall system status"""
+
+    agents = Agent.query.all()
+    active_tasks = AgentTask.query.filter_by(status='in_progress').count()
+    pending_tasks = AgentTask.query.filter_by(status='pending').count()
+    total_projects = Project.query.filter_by(user_id=current_user.id).count()
+
+    return jsonify({
+        'agents': {
+            'total': len(agents),
+            'online': len([a for a in agents if a.status == 'online']),
+            'offline': len([a for a in agents if a.status == 'offline'])
+        },
+        'tasks': {
+            'active': active_tasks,
+            'pending': pending_tasks
+        },
+        'projects': {
+            'total': total_projects
+        },
+        'system_health': 'healthy'
+    })
