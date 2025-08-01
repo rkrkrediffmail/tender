@@ -28,7 +28,7 @@ openpyxl==3.1.2
 python-magic==0.4.27
 
 # Security and authentication
-Werkzeug==2.3.7
+Werkzeug==3.0.6
 bcrypt==4.0.1
 cryptography==41.0.7
 PyJWT==2.8.0
