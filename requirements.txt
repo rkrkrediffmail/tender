@@ -35,7 +35,7 @@ PyJWT==2.8.0
 
 # HTTP requests and utilities
 requests==2.31.0
-urllib3==2.0.7
+urllib3==2.5.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 
