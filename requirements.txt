@@ -6,7 +6,7 @@ Flask-WTF==1.1.1
 Flask-Migrate==4.0.5
 Flask-CORS==4.0.0
 WTForms==3.0.1
-Jinja2==3.1.2
+Jinja2==3.1.6
 
 # WSGI server for production
 gunicorn==21.2.0
