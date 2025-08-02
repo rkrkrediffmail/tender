@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Workflow - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Multi-Agent Workflow</h1>
+                    <p class="text-muted">Real-time visualization of agent collaboration</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-play me-2"></i>Start Workflow
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-pause me-2"></i>Pause
+                    </button>
+                    <button class="btn btn-outline-danger">
+                        <i class="fas fa-stop me-2"></i>Stop
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow Visualization -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-project-diagram me-2"></i>Agent Orchestration Flow
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="workflow-container">
+                        <!-- Orchestrator -->
+                        <div class="workflow-stage orchestrator">
+                            <div class="stage-header">
+                                <h6><i class="fas fa-crown me-2"></i>Agent Orchestrator</h6>
+                                <span class="badge bg-primary">Active</span>
+                            </div>
+                            <div class="agent-node master-agent">
+                                <div class="agent-avatar">
+                                    <i class="fas fa-brain"></i>
+                                </div>
+                                <div class="agent-info">
+                                    <h6>Master AI</h6>
+                                    <small>Claude Sonnet 4 + o1</small>
+                                </div>
+                                <div class="agent-status">
+                                    <span class="status-indicator online"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Stage -->
+                        <div class="workflow-stage analysis-stage">
+                            <div class="stage-header">
+                                <h6><i class="fas fa-search me-2"></i>Analysis Agents</h6>
+                                <span class="badge bg-info">Processing</span>
+                            </div>
+                            <div class="agent-group">
+                                <div class="agent-node analysis-agent active">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-file-text"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Document Intel</h6>
+                                        <small>85% Complete</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator processing"></span>
+                                    </div>
+                                    <div class="progress-bar-mini">
+                                        <div class="progress-fill" style="width: 85%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node analysis-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-list-check"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Requirements</h6>
+                                        <small>Waiting</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator waiting"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node analysis-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Risk Assessment</h6>
+                                        <small>Waiting</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator waiting"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Solution Stage -->
+                        <div class="workflow-stage solution-stage">
+                            <div class="stage-header">
+                                <h6><i class="fas fa-cogs me-2"></i>Solution Agents</h6>
+                                <span class="badge bg-secondary">Pending</span>
+                            </div>
+                            <div class="agent-group">
+                                <div class="agent-node solution-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-sitemap"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Architecture</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node solution-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-brain"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Domain Expert</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node solution-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-calculator"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Cost Estimation</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Stage -->
+                        <div class="workflow-stage delivery-stage">
+                            <div class="stage-header">
+                                <h6><i class="fas fa-truck me-2"></i>Delivery Agents</h6>
+                                <span class="badge bg-secondary">Pending</span>
+                            </div>
+                            <div class="agent-group">
+                                <div class="agent-node delivery-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-calendar-alt"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Project Planning</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node delivery-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-file-alt"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Proposal Gen</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="agent-node delivery-agent">
+                                    <div class="agent-avatar">
+                                        <i class="fas fa-shield-alt"></i>
+                                    </div>
+                                    <div class="agent-info">
+                                        <h6>Quality Assurance</h6>
+                                        <small>Pending</small>
+                                    </div>
+                                    <div class="agent-status">
+                                        <span class="status-indicator pending"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Workflow Connections -->
+                        <svg class="workflow-connections">
+                            <!-- Add connection lines between stages -->
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Current Activity -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-activity me-2"></i>Current Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="activity-stream">
+                        <div class="activity-item active">
+                            <div class="activity-time">14:32:15</div>
+                            <div class="activity-agent">Document Intelligence</div>
+                            <div class="activity-message">
+                                Processing RFP document - Page 23 of 47
+                            </div>
+                            <div class="activity-progress">
+                                <div class="progress">
+                                    <div class="progress-bar bg-primary" style="width: 49%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-time">14:31:45</div>
+                            <div class="activity-agent">Master AI</div>
+                            <div class="activity-message">
+                                Coordinating analysis sequence for banking domain
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-time">14:30:12</div>
+                            <div class="activity-agent">Document Intelligence</div>
+                            <div class="activity-message">
+                                OCR processing completed - 97% accuracy achieved
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-time">14:29:33</div>
+                            <div class="activity-agent">Master AI</div>
+                            <div class="activity-message">
+                                Workflow initiated for tender analysis
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Dependencies -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-network-wired me-2"></i>Agent Dependencies
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="dependency-graph">
+                        <div class="dependency-item">
+                            <div class="dependency-source">Document Intelligence</div>
+                            <div class="dependency-arrow">→</div>
+                            <div class="dependency-target">Requirements Engineering</div>
+                            <div class="dependency-status">
+                                <span class="badge bg-warning">Blocked</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dependency-item">
+                            <div class="dependency-source">Requirements Engineering</div>
+                            <div class="dependency-arrow">→</div>
+                            <div class="dependency-target">Solution Architecture</div>
+                            <div class="dependency-status">
+                                <span class="badge bg-secondary">Waiting</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dependency-item">
+                            <div class="dependency-source">Risk Assessment</div>
+                            <div class="dependency-arrow">→</div>
+                            <div class="dependency-target">Cost Estimation</div>
+                            <div class="dependency-status">
+                                <span class="badge bg-secondary">Waiting</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dependency-item">
+                            <div class="dependency-source">Solution Architecture</div>
+                            <div class="dependency-arrow">→</div>
+                            <div class="dependency-target">Project Planning</div>
+                            <div class="dependency-status">
+                                <span class="badge bg-secondary">Waiting</span>
+                            </div>
+                        </div>
+                        
+                        <div class="dependency-item">
+                            <div class="dependency-source">Project Planning</div>
+                            <div class="dependency-arrow">→</div>
+                            <div class="dependency-target">Proposal Generation</div>
+                            <div class="dependency-status">
+                                <span class="badge bg-secondary">Waiting</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh workflow status
+    setInterval(() => {
+        // Update agent statuses and progress
+        console.log('Refreshing workflow status...');
+    }, 5000);
+    
+    // Animate workflow connections
+    function animateWorkflow() {
+        // Add visual flow animations between agents
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}Quality Assurance - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Quality Assurance Dashboard</h1>
+                    <p class="text-muted">AI-powered quality validation and compliance checking</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-play me-2"></i>Run Full Validation
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quality Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="quality-score excellent">
+                        <h2>94%</h2>
+                        <p class="mb-0">Overall Quality Score</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">127</h3>
+                    <p class="mb-0 text-muted">Checks Passed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">8</h3>
+                    <p class="mb-0 text-muted">Warnings</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-danger">2</h3>
+                    <p class="mb-0 text-muted">Critical Issues</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quality Checks -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-clipboard-check me-2"></i>Quality Validation Results
+                        </h5>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm active">All</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Critical</button>
+                            <button type="button" class="btn btn-outline-warning btn-sm">Warnings</button>
+                            <button type="button" class="btn btn-outline-success btn-sm">Passed</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="quality-checks">
+                        <!-- Critical Issue -->
+                        <div class="quality-check critical">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-times-circle text-danger"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Technical Specification Completeness</h6>
+                                    <small class="text-muted">Requirements Analysis → Solution Architecture</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-danger">Critical</span>
+                                </div>
+                            </div>
+                            <div class="check-content">
+                                <p class="text-danger">
+                                    <strong>Issue:</strong> Missing detailed specifications for 3 high-priority requirements (REQ-015, REQ-032, REQ-045)
+                                </p>
+                                <div class="check-details">
+                                    <ul class="small mb-2">
+                                        <li>REQ-015: Performance capacity specification incomplete</li>
+                                        <li>REQ-032: Infrastructure constraints not addressed</li>
+                                        <li>REQ-045: Security framework details missing</li>
+                                    </ul>
+                                    <div class="check-recommendation">
+                                        <strong>Recommendation:</strong> Request Solution Architecture Agent to provide detailed specifications for missing requirements
+                                    </div>
+                                </div>
+                                <div class="check-actions mt-2">
+                                    <button class="btn btn-sm btn-danger">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Escalate
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-robot me-1"></i>Auto-fix
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Warning -->
+                        <div class="quality-check warning">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Cost Estimation Accuracy</h6>
+                                    <small class="text-muted">Cost Estimation Agent</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-warning">Warning</span>
+                                </div>
+                            </div>
+                            <div class="check-content">
+                                <p class="text-warning">
+                                    <strong>Warning:</strong> Cost estimates have 15% variance from industry benchmarks
+                                </p>
+                                <div class="check-details">
+                                    <p class="small mb-2">Development costs appear 15% higher than similar projects. Consider reviewing resource allocation and hourly rates.</p>
+                                    <div class="check-recommendation">
+                                        <strong>Recommendation:</strong> Validate assumptions with Cost Estimation Agent and review market rates
+                                    </div>
+                                </div>
+                                <div class="check-actions mt-2">
+                                    <button class="btn btn-sm btn-warning">
+                                        <i class="fas fa-flag me-1"></i>Flag for Review
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-sync me-1"></i>Recalculate
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Passed Check -->
+                        <div class="quality-check passed">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Compliance Verification</h6>
+                                    <small class="text-muted">All Agent Outputs</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-success">Passed</span>
+                                </div>
+                            </div>
+                            <div class="check-content">
+                                <p class="text-success">
+                                    <strong>Verification Complete:</strong> All deliverables meet SAMA regulatory requirements
+                                </p>
+                                <div class="check-details">
+                                    <div class="compliance-items">
+                                        <div class="compliance-item">
+                                            <i class="fas fa-check text-success me-2"></i>
+                                            <span>Data residency requirements - Saudi Arabia</span>
+                                        </div>
+                                        <div class="compliance-item">
+                                            <i class="fas fa-check text-success me-2"></i>
+                                            <span>Basel III capital requirements compliance</span>
+                                        </div>
+                                        <div class="compliance-item">
+                                            <i class="fas fa-check text-success me-2"></i>
+                                            <span>Cybersecurity framework alignment</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Another Warning -->
+                        <div class="quality-check warning">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Timeline Feasibility</h6>
+                                    <small class="text-muted">Project Planning Agent</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-warning">Warning</span>
+                                </div>
+                            </div>
+                            <div class="check-content">
+                                <p class="text-warning">
+                                    <strong>Timeline Risk:</strong> Aggressive schedule with minimal buffer time
+                                </p>
+                                <div class="check-details">
+                                    <p class="small mb-2">Current timeline allows only 2 weeks buffer across 18-week project. Risk of delays is high.</p>
+                                    <div class="check-recommendation">
+                                        <strong>Recommendation:</strong> Consider extending timeline by 2-3 weeks or reducing scope for Phase 1
+                                    </div>
+                                </div>
+                                <div class="check-actions mt-2">
+                                    <button class="btn btn-sm btn-warning">
+                                        <i class="fas fa-calendar me-1"></i>Adjust Timeline
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-balance-scale me-1"></i>Rebalance Scope
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Critical Issue -->
+                        <div class="quality-check critical">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-times-circle text-danger"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Cross-Agent Consistency</h6>
+                                    <small class="text-muted">Requirements ↔ Architecture ↔ Planning</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-danger">Critical</span>
+                                </div>
+                            </div>
+                            <div class="check-content">
+                                <p class="text-danger">
+                                    <strong>Inconsistency Detected:</strong> Performance requirements conflict between agents
+                                </p>
+                                <div class="check-details">
+                                    <div class="conflict-matrix">
+                                        <div class="conflict-item">
+                                            <span class="agent-name">Requirements Agent:</span>
+                                            <span class="conflict-value">1000 TPS required</span>
+                                        </div>
+                                        <div class="conflict-item">
+                                            <span class="agent-name">Architecture Agent:</span>
+                                            <span class="conflict-value">500 TPS capacity designed</span>
+                                        </div>
+                                        <div class="conflict-item">
+                                            <span class="agent-name">Planning Agent:</span>
+                                            <span class="conflict-value">750 TPS timeline based</span>
+                                        </div>
+                                    </div>
+                                    <div class="check-recommendation">
+                                        <strong>Recommendation:</strong> Initiate agent consensus building to resolve performance target
+                                    </div>
+                                </div>
+                                <div class="check-actions mt-2">
+                                    <button class="btn btn-sm btn-danger">
+                                        <i class="fas fa-users me-1"></i>Start Consensus
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-balance-scale me-1"></i>Mediate Conflict
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- More Passed Checks -->
+                        <div class="quality-check passed collapsed">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Document Completeness</h6>
+                                    <small class="text-muted">Proposal Generation Agent</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-success">Passed</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="quality-check passed collapsed">
+                            <div class="check-header">
+                                <div class="check-icon">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div class="check-info">
+                                    <h6>Technical Accuracy</h6>
+                                    <small class="text-muted">Solution Architecture Agent</small>
+                                </div>
+                                <div class="check-status">
+                                    <span class="badge bg-success">Passed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Show More Button -->
+                    <div class="text-center mt-3">
+                        <button class="btn btn-outline-secondary" id="showMoreChecks">
+                            <i class="fas fa-chevron-down me-2"></i>Show 15 More Checks
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QA Agent & Analytics -->
+        <div class="col-md-4">
+            <!-- Quality Assurance Agent -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>Quality Assurance Agent
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="agent-status">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1"></i>Active
+                            </span>
+                            <small class="text-muted">Claude Sonnet 4 + o1</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small">Validation Progress</label>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 91%"></div>
+                            </div>
+                            <small class="text-muted">137 of 150 checks complete</small>
+                        </div>
+
+                        <div class="qa-capabilities">
+                            <h6 class="small mb-2">Active Validations:</h6>
+                            <ul class="list-unstyled small">
+                                <li><i class="fas fa-check text-success me-2"></i>Cross-agent consistency</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Technical accuracy</li>
+                                <li><i class="fas fa-spinner fa-spin text-primary me-2"></i>Compliance verification</li>
+                                <li><i class="fas fa-clock text-warning me-2"></i>Completeness analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality Metrics -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Quality Metrics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="qualityMetricsChart" height="250"></canvas>
+                </div>
+            </div>
+
+            <!-- Compliance Status -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>Compliance Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="compliance-checklist">
+                        <div class="compliance-category">
+                            <h6 class="small mb-2">Regulatory Compliance</h6>
+                            <div class="compliance-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span>SAMA Banking Regulations</span>
+                                <span class="badge bg-success ms-auto">100%</span>
+                            </div>
+                            <div class="compliance-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span>Basel III Requirements</span>
+                                <span class="badge bg-success ms-auto">98%</span>
+                            </div>
+                            <div class="compliance-item">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                <span>Data Protection Laws</span>
+                                <span class="badge bg-warning ms-auto">85%</span>
+                            </div>
+                        </div>
+
+                        <div class="compliance-category mt-3">
+                            <h6 class="small mb-2">Technical Standards</h6>
+                            <div class="compliance-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span>ISO 27001 Security</span>
+                                <span class="badge bg-success ms-auto">96%</span>
+                            </div>
+                            <div class="compliance-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span>PCI DSS Compliance</span>
+                                <span class="badge bg-success ms-auto">94%</span>
+                            </div>
+                            <div class="compliance-item">
+                                <i class="fas fa-times-circle text-danger me-2"></i>
+                                <span>API Security Standards</span>
+                                <span class="badge bg-danger ms-auto">72%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality Trends -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trending-up me-2"></i>Quality Trends
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="trend-metrics">
+                        <div class="trend-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Overall Score</span>
+                                <span class="text-success">
+                                    <i class="fas fa-arrow-up me-1"></i>+2.3%
+                                </span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 94%"></div>
+                            </div>
+                        </div>
+
+                        <div class="trend-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Critical Issues</span>
+                                <span class="text-danger">
+                                    <i class="fas fa-arrow-up me-1"></i>+1
+                                </span>
+                            </div>
+                            <small class="text-muted">2 critical issues identified</small>
+                        </div>
+
+                        <div class="trend-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Resolution Time</span>
+                                <span class="text-success">
+                                    <i class="fas fa-arrow-down me-1"></i>-15%
+                                </span>
+                            </div>
+                            <small class="text-muted">Average 2.3 hours</small>
+                        </div>
+
+                        <div class="trend-item">
+                            <div class="d-flex justify-content-between">
+                                <span>Auto-fix Success</span>
+                                <span class="text-success">
+                                    <i class="fas fa-arrow-up me-1"></i>+5%
+                                </span>
+                            </div>
+                            <small class="text-muted">87% success rate</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Fix Critical Issues
+                        </button>
+                        <button class="btn btn-outline-warning">
+                            <i class="fas fa-magic me-2"></i>Auto-resolve Warnings
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-sync me-2"></i>Re-run All Checks
+                        </button>
+                        <button class="btn btn-outline-success">
+                            <i class="fas fa-certificate me-2"></i>Generate QA Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Quality metrics radar chart
+    const ctx = document.getElementById('qualityMetricsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Completeness', 'Accuracy', 'Consistency', 'Compliance', 'Feasibility'],
+            datasets: [{
+                label: 'Current Quality',
+                data: [94, 89, 76, 96, 85],
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                pointBorderColor: '#198754',
+                pointBackgroundColor: '#198754'
+            }, {
+                label: 'Target Quality',
+                data: [95, 95, 95, 98, 90],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                pointBorderColor: '#0d6efd',
+                pointBackgroundColor: '#0d6efd',
+                borderDash: [5, 5]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // Show more checks functionality
+    document.getElementById('showMoreChecks').addEventListener('click', function() {
+        document.querySelectorAll('.quality-check.collapsed').forEach(check => {
+            check.classList.remove('collapsed');
+        });
+        this.style.display = 'none';
+    });
+
+    // Quality check interactions
+    document.querySelectorAll('.quality-check .check-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const check = this.closest('.quality-check');
+            const content = check.querySelector('.check-content');
+            if (content) {
+                content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

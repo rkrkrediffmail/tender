@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block title %}Requirements Analysis - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Requirements Analysis</h1>
+                    <p class="text-muted">AI-powered requirement extraction and classification</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-sync me-2"></i>Re-analyze
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Requirements Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">127</h3>
+                    <p class="card-text">Total Requirements</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">89</h3>
+                    <p class="card-text">Functional</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">38</h3>
+                    <p class="card-text">Non-Functional</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-danger">7</h3>
+                    <p class="card-text">Conflicts</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Requirements List -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list-check me-2"></i>Requirements Catalog
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" style="width: auto;">
+                                <option>All Categories</option>
+                                <option>Functional</option>
+                                <option>Non-Functional</option>
+                                <option>Technical</option>
+                                <option>Business</option>
+                            </select>
+                            <select class="form-select form-select-sm" style="width: auto;">
+                                <option>All Priorities</option>
+                                <option>Must Have</option>
+                                <option>Should Have</option>
+                                <option>Could Have</option>
+                                <option>Won't Have</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="requirements-list">
+                        <!-- Requirement Item -->
+                        <div class="requirement-item high-priority">
+                            <div class="requirement-header">
+                                <div class="requirement-id">REQ-001</div>
+                                <div class="requirement-category">
+                                    <span class="badge bg-primary">Functional</span>
+                                </div>
+                                <div class="requirement-priority">
+                                    <span class="badge bg-danger">Must Have</span>
+                                </div>
+                                <div class="requirement-confidence">
+                                    <span class="badge bg-success">95% Confidence</span>
+                                </div>
+                            </div>
+                            <div class="requirement-content">
+                                <h6>Real-time Transaction Processing</h6>
+                                <p>The system must process banking transactions in real-time with a maximum latency of 100ms for domestic transfers and 500ms for international transfers.</p>
+                                <div class="requirement-details">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small><strong>Source:</strong> Section 3.2.1, Page 12</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small><strong>Stakeholder:</strong> Operations Team</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="requirement-actions">
+                                <button class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-flag"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Requirement Item with Conflict -->
+                        <div class="requirement-item conflict">
+                            <div class="requirement-header">
+                                <div class="requirement-id">REQ-015</div>
+                                <div class="requirement-category">
+                                    <span class="badge bg-warning">Non-Functional</span>
+                                </div>
+                                <div class="requirement-priority">
+                                    <span class="badge bg-warning">Should Have</span>
+                                </div>
+                                <div class="requirement-confidence">
+                                    <span class="badge bg-warning">78% Confidence</span>
+                                </div>
+                                <div class="conflict-indicator">
+                                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                                </div>
+                            </div>
+                            <div class="requirement-content">
+                                <h6>System Performance Capacity</h6>
+                                <p>The system must handle 1000 transactions per second during peak hours.</p>
+                                <div class="conflict-alert">
+                                    <div class="alert alert-danger">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <strong>Conflict detected with REQ-032:</strong> Infrastructure constraints suggest maximum 500 TPS capacity
+                                    </div>
+                                </div>
+                                <div class="requirement-details">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small><strong>Source:</strong> Section 4.1.3, Page 18</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small><strong>Stakeholder:</strong> Technical Team</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="requirement-actions">
+                                <button class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- More requirement items -->
+                        <div class="requirement-item">
+                            <div class="requirement-header">
+                                <div class="requirement-id">REQ-023</div>
+                                <div class="requirement-category">
+                                    <span class="badge bg-info">Technical</span>
+                                </div>
+                                <div class="requirement-priority">
+                                    <span class="badge bg-success">Could Have</span>
+                                </div>
+                                <div class="requirement-confidence">
+                                    <span class="badge bg-success">92% Confidence</span>
+                                </div>
+                            </div>
+                            <div class="requirement-content">
+                                <h6>API Integration Standards</h6>
+                                <p>All external integrations must follow RESTful API standards with OAuth 2.0 authentication and support for JSON data format.</p>
+                                <div class="requirement-details">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small><strong>Source:</strong> Appendix B, Page 45</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small><strong>Stakeholder:</strong> Integration Team</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="requirement-actions">
+                                <button class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="requirement-item">
+                            <div class="requirement-header">
+                                <div class="requirement-id">REQ-034</div>
+                                <div class="requirement-category">
+                                    <span class="badge bg-secondary">Business</span>
+                                </div>
+                                <div class="requirement-priority">
+                                    <span class="badge bg-warning">Should Have</span>
+                                </div>
+                                <div class="requirement-confidence">
+                                    <span class="badge bg-warning">85% Confidence</span>
+                                </div>
+                            </div>
+                            <div class="requirement-content">
+                                <h6>Regulatory Compliance</h6>
+                                <p>The system must comply with SAMA regulations for banking operations in Saudi Arabia, including data residency and audit trail requirements.</p>
+                                <div class="requirement-details">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <small><strong>Source:</strong> Section 2.3, Page 8</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <small><strong>Stakeholder:</strong> Compliance Team</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="requirement-actions">
+                                <button class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-link"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#">Previous</a>
+                            </li>
+                            <li class="page-item active">
+                                <a class="page-link" href="#">1</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">2</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">3</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="#">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Panel -->
+        <div class="col-md-4">
+            <!-- Agent Status -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>Requirements Engineering Agent
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="agent-status">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1"></i>Active
+                            </span>
+                            <small class="text-muted">Claude Sonnet 4 + o1</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small">Analysis Progress</label>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 92%"></div>
+                            </div>
+                            <small class="text-muted">92% Complete</small>
+                        </div>
+
+                        <div class="analysis-stats">
+                            <div class="stat-row">
+                                <span>Documents Processed</span>
+                                <strong>3/3</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Requirements Extracted</span>
+                                <strong>127</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Conflicts Identified</span>
+                                <strong>7</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Avg. Confidence</span>
+                                <strong>87%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MoSCoW Prioritization -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-sort-amount-down me-2"></i>MoSCoW Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="priorityChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+
+            <!-- Gap Analysis -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-gap me-2"></i>Gap Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="gap-item">
+                        <div class="gap-header">
+                            <h6>Technical Capabilities</h6>
+                            <span class="badge bg-success">85% Match</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: 85%"></div>
+                        </div>
+                        <small class="text-muted">Strong alignment with existing capabilities</small>
+                    </div>
+
+                    <div class="gap-item">
+                        <div class="gap-header">
+                            <h6>Resource Requirements</h6>
+                            <span class="badge bg-warning">65% Match</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-warning" style="width: 65%"></div>
+                        </div>
+                        <small class="text-muted">Additional resources may be needed</small>
+                    </div>
+
+                    <div class="gap-item">
+                        <div class="gap-header">
+                            <h6>Timeline Feasibility</h6>
+                            <span class="badge bg-danger">45% Match</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-danger" style="width: 45%"></div>
+                        </div>
+                        <small class="text-muted">Aggressive timeline requires mitigation</small>
+                    </div>
+
+                    <div class="gap-item">
+                        <div class="gap-header">
+                            <h6>Compliance Coverage</h6>
+                            <span class="badge bg-success">95% Match</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: 95%"></div>
+                        </div>
+                        <small class="text-muted">Excellent compliance alignment</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary">
+                            <i class="fas fa-magic me-2"></i>Auto-resolve Conflicts
+                        </button>
+                        <button class="btn btn-outline-secondary">
+                            <i class="fas fa-chart-line me-2"></i>Generate Traceability
+                        </button>
+                        <button class="btn btn-outline-info">
+                            <i class="fas fa-file-export me-2"></i>Export to Solution Agent
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Priority Distribution Chart
+    const ctx = document.getElementById('priorityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Must Have', 'Should Have', 'Could Have', 'Won\'t Have'],
+            datasets: [{
+                data: [45, 38, 32, 12],
+                backgroundColor: [
+                    '#dc3545',
+                    '#ffc107',
+                    '#198754',
+                    '#6c757d'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

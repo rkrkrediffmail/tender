@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}Solution Architecture - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Solution Architecture</h1>
+                    <p class="text-muted">AI-generated technical architecture and design recommendations</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-sync me-2"></i>Regenerate
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Architecture Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-sitemap me-2"></i>System Architecture Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="architecture-diagram">
+                        <!-- Presentation Layer -->
+                        <div class="arch-layer presentation">
+                            <div class="layer-header">
+                                <h6><i class="fas fa-desktop me-2"></i>Presentation Layer</h6>
+                            </div>
+                            <div class="layer-components">
+                                <div class="component">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <span>Mobile App</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-globe"></i>
+                                    <span>Web Portal</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-tablet-alt"></i>
+                                    <span>Tablet Interface</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Gateway -->
+                        <div class="arch-layer gateway">
+                            <div class="layer-header">
+                                <h6><i class="fas fa-shield-alt me-2"></i>API Gateway & Security</h6>
+                            </div>
+                            <div class="layer-components">
+                                <div class="component">
+                                    <i class="fas fa-key"></i>
+                                    <span>OAuth 2.0</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-balance-scale"></i>
+                                    <span>Load Balancer</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <span>Rate Limiting</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Business Layer -->
+                        <div class="arch-layer business">
+                            <div class="layer-header">
+                                <h6><i class="fas fa-cogs me-2"></i>Business Logic Layer</h6>
+                            </div>
+                            <div class="layer-components">
+                                <div class="component">
+                                    <i class="fas fa-university"></i>
+                                    <span>Core Banking</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-credit-card"></i>
+                                    <span>Payment Processing</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>Analytics Engine</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-bell"></i>
+                                    <span>Notification Service</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Layer -->
+                        <div class="arch-layer data">
+                            <div class="layer-header">
+                                <h6><i class="fas fa-database me-2"></i>Data Layer</h6>
+                            </div>
+                            <div class="layer-components">
+                                <div class="component">
+                                    <i class="fas fa-server"></i>
+                                    <span>Primary DB</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-copy"></i>
+                                    <span>Read Replicas</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-archive"></i>
+                                    <span>Data Warehouse</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-hdd"></i>
+                                    <span>Cache Layer</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Infrastructure Layer -->
+                        <div class="arch-layer infrastructure">
+                            <div class="layer-header">
+                                <h6><i class="fas fa-cloud me-2"></i>Infrastructure Layer</h6>
+                            </div>
+                            <div class="layer-components">
+                                <div class="component">
+                                    <i class="fas fa-docker"></i>
+                                    <span>Containers</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-dharmachakra"></i>
+                                    <span>Kubernetes</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-network-wired"></i>
+                                    <span>Service Mesh</span>
+                                </div>
+                                <div class="component">
+                                    <i class="fas fa-eye"></i>
+                                    <span>Monitoring</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Technology Stack -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-layer-group me-2"></i>Recommended Technology Stack
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="tech-stack">
+                        <!-- Frontend -->
+                        <div class="tech-category">
+                            <h6 class="tech-category-title">
+                                <i class="fas fa-paint-brush me-2"></i>Frontend Technologies
+                            </h6>
+                            <div class="tech-items">
+                                <div class="tech-item recommended">
+                                    <div class="tech-icon">
+                                        <i class="fab fa-react"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>React.js</h6>
+                                        <p class="small">Modern UI framework with excellent performance</p>
+                                        <span class="badge bg-success">Recommended</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">95%</span>
+                                    </div>
+                                </div>
+                                <div class="tech-item">
+                                    <div class="tech-icon">
+                                        <i class="fab fa-bootstrap"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>Bootstrap 5</h6>
+                                        <p class="small">Responsive CSS framework</p>
+                                        <span class="badge bg-primary">Included</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">88%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Backend -->
+                        <div class="tech-category">
+                            <h6 class="tech-category-title">
+                                <i class="fas fa-server me-2"></i>Backend Technologies
+                            </h6>
+                            <div class="tech-items">
+                                <div class="tech-item recommended">
+                                    <div class="tech-icon">
+                                        <i class="fab fa-java"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>Spring Boot</h6>
+                                        <p class="small">Enterprise-grade Java framework</p>
+                                        <span class="badge bg-success">Recommended</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">92%</span>
+                                    </div>
+                                </div>
+                                <div class="tech-item">
+                                    <div class="tech-icon">
+                                        <i class="fas fa-leaf"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>MongoDB</h6>
+                                        <p class="small">NoSQL database for flexible data storage</p>
+                                        <span class="badge bg-info">Alternative</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">85%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Integration -->
+                        <div class="tech-category">
+                            <h6 class="tech-category-title">
+                                <i class="fas fa-plug me-2"></i>Integration & APIs
+                            </h6>
+                            <div class="tech-items">
+                                <div class="tech-item recommended">
+                                    <div class="tech-icon">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>Apache Kafka</h6>
+                                        <p class="small">Event streaming platform</p>
+                                        <span class="badge bg-success">Recommended</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">90%</span>
+                                    </div>
+                                </div>
+                                <div class="tech-item">
+                                    <div class="tech-icon">
+                                        <i class="fas fa-route"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>REST APIs</h6>
+                                        <p class="small">Standard web service architecture</p>
+                                        <span class="badge bg-primary">Standard</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">87%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Security -->
+                        <div class="tech-category">
+                            <h6 class="tech-category-title">
+                                <i class="fas fa-shield-alt me-2"></i>Security & Compliance
+                            </h6>
+                            <div class="tech-items">
+                                <div class="tech-item recommended">
+                                    <div class="tech-icon">
+                                        <i class="fas fa-key"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>OAuth 2.0 / OIDC</h6>
+                                        <p class="small">Industry standard authentication</p>
+                                        <span class="badge bg-success">Required</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">98%</span>
+                                    </div>
+                                </div>
+                                <div class="tech-item">
+                                    <div class="tech-icon">
+                                        <i class="fas fa-lock"></i>
+                                    </div>
+                                    <div class="tech-info">
+                                        <h6>TLS 1.3</h6>
+                                        <p class="small">Encryption in transit</p>
+                                        <span class="badge bg-success">Required</span>
+                                    </div>
+                                    <div class="tech-score">
+                                        <span class="score">96%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Agent & Metrics -->
+        <div class="col-md-4">
+            <!-- Solution Architecture Agent -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>Solution Architecture Agent
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="agent-status">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1"></i>Active
+                            </span>
+                            <small class="text-muted">Claude Sonnet 4 + o1</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small">Architecture Generation</label>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 90%"></div>
+                            </div>
+                            <small class="text-muted">90% Complete</small>
+                        </div>
+
+                        <div class="agent-capabilities">
+                            <h6 class="small mb-2">Active Analysis:</h6>
+                            <ul class="list-unstyled small">
+                                <li><i class="fas fa-check text-success me-2"></i>TOGAF Framework Applied</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Cloud Platform Assessment</li>
+                                <li><i class="fas fa-spinner fa-spin text-primary me-2"></i>Performance Modeling</li>
+                                <li><i class="fas fa-clock text-warning me-2"></i>Security Architecture</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Architecture Metrics -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Architecture Metrics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="metric-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Scalability Score</span>
+                            <strong class="text-success">92/100</strong>
+                        </div>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-success" style="width: 92%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Security Rating</span>
+                            <strong class="text-success">95/100</strong>
+                        </div>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-success" style="width: 95%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Maintainability</span>
+                            <strong class="text-warning">78/100</strong>
+                        </div>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-warning" style="width: 78%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Cost Efficiency</span>
+                            <strong class="text-success">88/100</strong>
+                        </div>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-success" style="width: 88%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <div class="d-flex justify-content-between">
+                            <span>Compliance Score</span>
+                            <strong class="text-success">96/100</strong>
+                        </div>
+                        <div class="progress mt-1">
+                            <div class="progress-bar bg-success" style="width: 96%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Patterns -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-puzzle-piece me-2"></i>Integration Patterns
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="pattern-item">
+                        <div class="pattern-header">
+                            <i class="fas fa-exchange-alt me-2"></i>
+                            <span>Event-Driven Architecture</span>
+                        </div>
+                        <small class="text-muted">Recommended for real-time processing</small>
+                    </div>
+                    
+                    <div class="pattern-item">
+                        <div class="pattern-header">
+                            <i class="fas fa-sitemap me-2"></i>
+                            <span>Microservices</span>
+                        </div>
+                        <small class="text-muted">Enables independent scaling</small>
+                    </div>
+                    
+                    <div class="pattern-item">
+                        <div class="pattern-header">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            <span>API Gateway</span>
+                        </div>
+                        <small class="text-muted">Centralized security and routing</small>
+                    </div>
+                    
+                    <div class="pattern-item">
+                        <div class="pattern-header">
+                            <i class="fas fa-database me-2"></i>
+                            <span>CQRS</span>
+                        </div>
+                        <small class="text-muted">Optimized read/write operations</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary">
+                            <i class="fas fa-file-code me-2"></i>Generate Code Templates
+                        </button>
+                        <button class="btn btn-outline-secondary">
+                            <i class="fas fa-cloud me-2"></i>Deploy to Cloud
+                        </button>
+                        <button class="btn btn-outline-info">
+                            <i class="fas fa-share me-2"></i>Share with Team
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Interactive architecture diagram
+    document.querySelectorAll('.component').forEach(component => {
+        component.addEventListener('click', function() {
+            // Show component details
+            console.log('Component clicked:', this.textContent);
+        });
+    });
+</script>
+{% endblock %}

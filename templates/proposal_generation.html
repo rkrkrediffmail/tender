@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+
+{% block title %}Proposal Generation - AI Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">Proposal Generation</h1>
+                    <p class="text-muted">AI-powered proposal creation and document synthesis</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success">
+                        <i class="fas fa-magic me-2"></i>Generate Proposal
+                    </button>
+                    <button class="btn btn-outline-primary">
+                        <i class="fas fa-eye me-2"></i>Preview
+                    </button>
+                    <button class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Document Editor -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-file-alt me-2"></i>Proposal Document
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" style="width: auto;">
+                                <option>Banking Modernization Template</option>
+                                <option>Healthcare System Template</option>
+                                <option>E-commerce Platform Template</option>
+                                <option>Custom Template</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Document Structure -->
+                    <div class="document-structure">
+                        <div class="structure-nav">
+                            <div class="nav nav-pills flex-column" role="tablist">
+                                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#executive-summary">
+                                    <i class="fas fa-crown me-2"></i>Executive Summary
+                                    <span class="badge bg-success ms-auto">Complete</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#technical-approach">
+                                    <i class="fas fa-cogs me-2"></i>Technical Approach
+                                    <span class="badge bg-warning ms-auto">In Progress</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#solution-architecture">
+                                    <i class="fas fa-sitemap me-2"></i>Solution Architecture
+                                    <span class="badge bg-primary ms-auto">Generated</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#implementation-plan">
+                                    <i class="fas fa-calendar-alt me-2"></i>Implementation Plan
+                                    <span class="badge bg-info ms-auto">Ready</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#cost-estimation">
+                                    <i class="fas fa-calculator me-2"></i>Cost Estimation
+                                    <span class="badge bg-success ms-auto">Complete</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#risk-assessment">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Risk Assessment
+                                    <span class="badge bg-warning ms-auto">Review</span>
+                                </button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#team-qualifications">
+                                    <i class="fas fa-users me-2"></i>Team & Qualifications
+                                    <span class="badge bg-secondary ms-auto">Pending</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="structure-content">
+                            <div class="tab-content">
+                                <!-- Executive Summary -->
+                                <div class="tab-pane fade show active" id="executive-summary">
+                                    <div class="content-editor">
+                                        <div class="editor-toolbar">
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-bold"></i>
+                                                </button>
+                                                <button class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-italic"></i>
+                                                </button>
+                                                <button class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-underline"></i>
+                                                </button>
+                                            </div>
+                                            <div class="btn-group ms-2" role="group">
+                                                <button class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-list-ul"></i>
+                                                </button>
+                                                <button class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-list-ol"></i>
+                                                </button>
+                                            </div>
+                                            <button class="btn btn-outline-primary btn-sm ms-2">
+                                                <i class="fas fa-robot me-1"></i>AI Enhance
+                                            </button>
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15">
+## Executive Summary
+
+### Project Overview
+We are pleased to present our comprehensive proposal for the Banking Modernization Initiative. Our solution leverages cutting-edge technology and proven methodologies to transform your banking infrastructure while ensuring regulatory compliance and operational excellence.
+
+### Our Understanding
+Based on our analysis of your requirements, we understand that your organization seeks to:
+- Modernize core banking systems to support real-time processing
+- Enhance customer experience through digital channels
+- Ensure compliance with SAMA regulations and international standards
+- Implement robust security frameworks for data protection
+
+### Proposed Solution Highlights
+Our solution encompasses:
+- **Cloud-native Architecture**: Scalable microservices-based platform
+- **Real-time Processing**: Sub-100ms transaction processing capability
+- **Enhanced Security**: Multi-layered security with AI-powered fraud detection
+- **Regulatory Compliance**: Built-in SAMA and Basel III compliance frameworks
+
+### Value Proposition
+- **Reduced Operating Costs**: 35% reduction in infrastructure costs
+- **Improved Performance**: 10x improvement in transaction processing speed
+- **Enhanced Customer Experience**: 50% reduction in customer service response time
+- **Future-ready Platform**: Scalable architecture supporting growth for 10+ years
+
+### Investment Overview
+Total project investment: $4.2M over 18 months with expected ROI of 180% within 3 years.
+                                        </textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Approach -->
+                                <div class="tab-pane fade" id="technical-approach">
+                                    <div class="content-editor">
+                                        <div class="ai-generation-status">
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-robot me-2"></i>
+                                                <strong>AI Generation in Progress...</strong>
+                                                <div class="progress mt-2">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 65%"></div>
+                                                </div>
+                                                <small>Synthesizing technical approach from solution architecture...</small>
+                                            </div>
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15" placeholder="AI-generated technical approach will appear here..."></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Solution Architecture -->
+                                <div class="tab-pane fade" id="solution-architecture">
+                                    <div class="content-editor">
+                                        <div class="generated-content">
+                                            <div class="alert alert-success">
+                                                <i class="fas fa-check me-2"></i>
+                                                Content generated by Solution Architecture Agent
+                                            </div>
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15">
+## Solution Architecture
+
+### Architecture Overview
+Our proposed solution follows a modern, cloud-native architecture built on microservices principles...
+
+### Technology Stack
+- **Frontend**: React.js with responsive design
+- **Backend**: Spring Boot microservices
+- **Database**: PostgreSQL with MongoDB for document storage
+- **Integration**: Apache Kafka for event streaming
+- **Security**: OAuth 2.0 with multi-factor authentication
+
+### Scalability & Performance
+The architecture is designed to handle:
+- 1000+ transactions per second
+- 99.9% uptime availability
+- Horizontal scaling capabilities
+- Real-time data processing
+                                        </textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Implementation Plan -->
+                                <div class="tab-pane fade" id="implementation-plan">
+                                    <div class="content-editor">
+                                        <div class="generated-content">
+                                            <div class="alert alert-primary">
+                                                <i class="fas fa-calendar me-2"></i>
+                                                Timeline generated by Project Planning Agent
+                                            </div>
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15">
+## Implementation Timeline
+
+### Phase 1: Analysis & Design (4 weeks)
+- Requirements validation and gap analysis
+- Detailed technical design and architecture review
+- Security framework design
+- Integration planning
+
+### Phase 2: Core Development (8 weeks)
+- Core banking module development
+- API development and testing
+- Database design and implementation
+- Security implementation
+
+### Phase 3: Integration & Testing (4 weeks)
+- System integration testing
+- Performance testing and optimization
+- Security testing and compliance validation
+- User acceptance testing
+
+### Phase 4: Deployment & Go-live (2 weeks)
+- Production deployment
+- Data migration and validation
+- User training and support
+- Go-live support
+                                        </textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Cost Estimation -->
+                                <div class="tab-pane fade" id="cost-estimation">
+                                    <div class="content-editor">
+                                        <div class="cost-breakdown">
+                                            <div class="alert alert-success">
+                                                <i class="fas fa-calculator me-2"></i>
+                                                Pricing optimized by Cost Estimation Agent
+                                            </div>
+                                            <div class="cost-table">
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Cost Category</th>
+                                                            <th>Hours</th>
+                                                            <th>Rate</th>
+                                                            <th>Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>Solution Architecture</td>
+                                                            <td>320</td>
+                                                            <td>$150</td>
+                                                            <td>$48,000</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Backend Development</td>
+                                                            <td>1,280</td>
+                                                            <td>$120</td>
+                                                            <td>$153,600</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Frontend Development</td>
+                                                            <td>800</td>
+                                                            <td>$100</td>
+                                                            <td>$80,000</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>QA & Testing</td>
+                                                            <td>480</td>
+                                                            <td>$90</td>
+                                                            <td>$43,200</td>
+                                                        </tr>
+                                                        <tr class="table-primary">
+                                                            <td><strong>Total</strong></td>
+                                                            <td><strong>2,880</strong></td>
+                                                            <td>-</td>
+                                                            <td><strong>$324,800</strong></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Risk Assessment -->
+                                <div class="tab-pane fade" id="risk-assessment">
+                                    <div class="content-editor">
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            Risks identified by Risk Assessment Agent - requires review
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15">
+## Risk Assessment & Mitigation
+
+### High Priority Risks
+1. **Integration Complexity** (Probability: High, Impact: High)
+   - Risk: Legacy system integration challenges
+   - Mitigation: Dedicated integration testing phase, fallback strategies
+
+2. **Regulatory Compliance** (Probability: Medium, Impact: High)
+   - Risk: Changes in SAMA regulations during development
+   - Mitigation: Continuous compliance monitoring, flexible architecture
+
+### Medium Priority Risks
+3. **Resource Availability** (Probability: Medium, Impact: Medium)
+   - Risk: Key team members unavailable during critical phases
+   - Mitigation: Cross-training, backup resource allocation
+
+### Risk Monitoring
+- Weekly risk assessment reviews
+- Proactive mitigation strategy implementation
+- Escalation procedures for high-impact risks
+                                        </textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Team Qualifications -->
+                                <div class="tab-pane fade" id="team-qualifications">
+                                    <div class="content-editor">
+                                        <div class="alert alert-secondary">
+                                            <i class="fas fa-clock me-2"></i>
+                                            Awaiting input from HR and team leads
+                                        </div>
+                                        <textarea class="form-control editor-content" rows="15" placeholder="Team qualifications and experience will be populated here..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generation Panel -->
+        <div class="col-md-4">
+            <!-- Proposal Generation Agent -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>Proposal Generation Agent
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="agent-status">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge bg-success">
+                                <i class="fas fa-circle me-1"></i>Active
+                            </span>
+                            <small class="text-muted">Claude Sonnet 4</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small">Generation Progress</label>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: 75%"></div>
+                            </div>
+                            <small class="text-muted">5 of 7 sections complete</small>
+                        </div>
+
+                        <div class="generation-stats">
+                            <div class="stat-row">
+                                <span>Word Count</span>
+                                <strong>12,847</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Pages Generated</span>
+                                <strong>24</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Sections Complete</span>
+                                <strong>5/7</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Quality Score</span>
+                                <strong class="text-success">93%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Sources -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-link me-2"></i>Content Sources
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="source-list">
+                        <div class="source-item">
+                            <div class="source-icon">
+                                <i class="fas fa-file-text text-primary"></i>
+                            </div>
+                            <div class="source-info">
+                                <h6>Requirements Analysis</h6>
+                                <small class="text-muted">127 requirements synthesized</small>
+                            </div>
+                            <div class="source-status">
+                                <span class="badge bg-success">Integrated</span>
+                            </div>
+                        </div>
+
+                        <div class="source-item">
+                            <div class="source-icon">
+                                <i class="fas fa-sitemap text-success"></i>
+                            </div>
+                            <div class="source-info">
+                                <h6>Solution Architecture</h6>
+                                <small class="text-muted">Technical specifications</small>
+                            </div>
+                            <div class="source-status">
+                                <span class="badge bg-success">Integrated</span>
+                            </div>
+                        </div>
+
+                        <div class="source-item">
+                            <div class="source-icon">
+                                <i class="fas fa-calendar-alt text-warning"></i>
+                            </div>
+                            <div class="source-info">
+                                <h6>Project Timeline</h6>
+                                <small class="text-muted">18-week implementation plan</small>
+                            </div>
+                            <div class="source-status">
+                                <span class="badge bg-success">Integrated</span>
+                            </div>
+                        </div>
+
+                        <div class="source-item">
+                            <div class="source-icon">
+                                <i class="fas fa-calculator text-info"></i>
+                            </div>
+                            <div class="source-info">
+                                <h6>Cost Analysis</h6>
+                                <small class="text-muted">$4.2M total investment</small>
+                            </div>
+                            <div class="source-status">
+                                <span class="badge bg-success">Integrated</span>
+                            </div>
+                        </div>
+
+                        <div class="source-item">
+                            <div class="source-icon">
+                                <i class="fas fa-exclamation-triangle text-danger"></i>
+                            </div>
+                            <div class="source-info">
+                                <h6>Risk Assessment</h6>
+                                <small class="text-muted">7 risks identified</small>
+                            </div>
+                            <div class="source-status">
+                                <span class="badge bg-warning">Review Required</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customization Options -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-sliders-h me-2"></i>Customization
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small">Writing Style</label>
+                        <select class="form-select form-select-sm">
+                            <option>Professional & Formal</option>
+                            <option>Technical & Detailed</option>
+                            <option>Executive Summary Style</option>
+                            <option>Consultative Approach</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">Target Audience</label>
+                        <select class="form-select form-select-sm">
+                            <option>C-Suite Executives</option>
+                            <option>Technical Decision Makers</option>
+                            <option>Procurement Team</option>
+                            <option>Mixed Audience</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">Emphasis Level</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label small">Cost Optimization</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label small">Technical Innovation</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox">
+                            <label class="form-check-label small">Risk Mitigation</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" checked>
+                            <label class="form-check-label small">Timeline Efficiency</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary">
+                            <i class="fas fa-magic me-2"></i>Auto-Complete Sections
+                        </button>
+                        <button class="btn btn-outline-secondary">
+                            <i class="fas fa-spell-check me-2"></i>Grammar Check
+                        </button>
+                        <button class="btn btn-outline-info">
+                            <i class="fas fa-chart-bar me-2"></i>Add Visualizations
+                        </button>
+                        <button class="btn btn-outline-success">
+                            <i class="fas fa-file-pdf me-2"></i>Generate PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-save functionality
+    let autoSaveTimeout;
+    document.querySelectorAll('.editor-content').forEach(editor => {
+        editor.addEventListener('input', function() {
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                console.log('Auto-saving content...');
+                // Implement auto-save logic here
+            }, 2000);
+        });
+    });
+
+    // Tab switching
+    document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function(e) {
+            console.log('Switched to:', e.target.textContent);
+        });
+    });
+</script>
+{% endblock %}
