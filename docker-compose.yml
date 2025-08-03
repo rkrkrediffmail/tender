@@ -33,6 +33,7 @@ services:
       - "5000:5000"
     environment:
       - FLASK_ENV=development
+      - FLASK_DEBUG=1
       - DATABASE_URL=postgresql://doadmin:12March1986$@bidpro.postgres.database.azure.com:5432/tender_system?sslmode=require
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
@@ -43,6 +44,7 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./.env:/app/.env
+      - .:/app
     depends_on:
       db:
         condition: service_healthy

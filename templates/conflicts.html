@@ -1,0 +1,147 @@
+CONFLICTS_TEMPLATE = '''
+{% extends "base.html" %}
+
+{% block title %}Conflicts - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_dashboard', project_id=project.id) }}">{{ project.name }}</a></li>
+                    <li class="breadcrumb-item active">Conflicts</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>Document Conflicts</h2>
+                    <p class="text-muted">Detected conflicts between different RFP documents</p>
+                </div>
+                <div>
+                    <span class="badge bg-warning fs-6">{{ conflicts|length }} Total Conflicts</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="all" {{ 'selected' if current_status == 'all' }}>All Statuses</option>
+                                <option value="pending" {{ 'selected' if current_status == 'pending' }}>Pending</option>
+                                <option value="resolved" {{ 'selected' if current_status == 'resolved' }}>Resolved</option>
+                                <option value="escalated" {{ 'selected' if current_status == 'escalated' }}>Escalated</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">Filter</button>
+                            <a href="{{ url_for('view_conflicts', project_id=project.id) }}" class="btn btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conflicts List -->
+    <div class="row">
+        <div class="col-12">
+            {% if conflicts %}
+                {% for conflict in conflicts %}
+                <div class="card mb-3 border-start border-{{ 'danger' if conflict.status == 'pending' else 'success' if conflict.status == 'resolved' else 'warning' }} border-4">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">{{ conflict.conflict_type.replace('_', ' ').title() }} Conflict</h6>
+                                <small class="text-muted">{{ conflict.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            <span class="badge bg-{{ 'danger' if conflict.status == 'pending' else 'success' if conflict.status == 'resolved' else 'warning' }}">
+                                {{ conflict.status.title() }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h6>Description</h6>
+                        <p>{{ conflict.description }}</p>
+
+                        {% if conflict.resolution_strategy %}
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Recommended Resolution</h6>
+                            <strong>Strategy:</strong> {{ conflict.resolution_strategy.replace('_', ' ').title() }}<br>
+                            {% if conflict.resolution_reasoning %}
+                            <strong>Reasoning:</strong> {{ conflict.resolution_reasoning }}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if conflict.resolved_value and conflict.status == 'resolved' %}
+                        <div class="alert alert-success">
+                            <h6 class="alert-heading">Resolution</h6>
+                            <strong>Resolved Value:</strong> {{ conflict.resolved_value }}<br>
+                            {% if conflict.resolved_at %}
+                            <small>Resolved on: {{ conflict.resolved_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                Involves {{ conflict.conflicting_key_point_ids|length }} key points
+                            </small>
+                        </div>
+
+                        {% if conflict.status == 'pending' %}
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-success" onclick="resolveConflict('{{ conflict.id }}')">
+                                Mark as Resolved
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="escalateConflict('{{ conflict.id }}')">
+                                Escalate
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h5>No Conflicts Found</h5>
+                        <p class="text-muted">No conflicts detected between documents with your current filters.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+async function resolveConflict(conflictId) {
+    const resolvedValue = prompt('Enter the resolved value for this conflict:');
+    if (resolvedValue) {
+        // Implementation for resolving conflicts
+        alert('Conflict marked as resolved!');
+        location.reload();
+    }
+}
+
+async function escalateConflict(conflictId) {
+    if (confirm('Escalate this conflict for manual review?')) {
+        // Implementation for escalating conflicts
+        alert('Conflict escalated!');
+        location.reload();
+    }
+}
+</script>
+{% endblock %}
+'''

@@ -1,13 +1,19 @@
-# models.py - Fixed User Model with Proper Password Hashing
+# models.py - Fixed with All Functionality Retained
 import os
 import hashlib
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import json
+import uuid
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
+
+# ========================================
+# USER & AUTHENTICATION MODELS
+# ========================================
 
 class User(UserMixin, db.Model):
     """User model with fixed password hashing"""
@@ -22,6 +28,10 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+
+    # Relationships
+    projects = db.relationship('Project', backref='user', lazy=True)
+    uploaded_documents = db.relationship('Document', foreign_keys='Document.uploaded_by', backref='uploader', lazy=True)
 
     def set_password(self, password):
         """Set password with proper hashing"""
@@ -67,41 +77,257 @@ class User(UserMixin, db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+# ========================================
+# PROJECT & DOCUMENT MODELS
+# ========================================
+
 class Project(db.Model):
-    """Project model"""
     __tablename__ = 'projects'
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
+    id = db.Column(db.String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text)
+    client_name = db.Column(db.String(255))
+    rfp_title = db.Column(db.String(500))  # Added for original functionality
+    estimated_value = db.Column(db.Numeric(15, 2))  # Added for original functionality
+    currency = db.Column(db.String(10), default='USD')  # Added for original functionality
+    priority = db.Column(db.String(50), default='medium')  # Added for original functionality
+    completion_percentage = db.Column(db.Integer, default=0)  # Added for original functionality
     status = db.Column(db.String(50), default='active')
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    meta_data = db.Column(db.JSON, default={})
 
-    # Relationship
-    user = db.relationship('User', backref='projects')
+    # Relationships - Fixed to avoid conflicts
+    rfp_documents = db.relationship('RFPDocument', backref='project', lazy=True, cascade='all, delete-orphan')
+    old_documents = db.relationship('Document', foreign_keys='Document.project_id', backref='old_project', lazy=True)
+    key_points = db.relationship('KeyPoint', backref='project', lazy=True, cascade='all, delete-orphan')
+    consolidated_points = db.relationship('ConsolidatedKeyPoint', backref='project', lazy=True, cascade='all, delete-orphan')
+    conflicts = db.relationship('Conflict', backref='project', lazy=True, cascade='all, delete-orphan')
+    missing_info = db.relationship('MissingInformation', backref='project', lazy=True, cascade='all, delete-orphan')
+    requirements = db.relationship('Requirement', foreign_keys='Requirement.project_id', backref='req_project', lazy=True)
+    agent_tasks = db.relationship('AgentTask', foreign_keys='AgentTask.project_id', backref='task_project', lazy=True)
 
     def __repr__(self):
         return f'<Project {self.name}>'
 
+# ========================================
+# ENHANCED RFP DOCUMENT MODELS (New Multi-Document)
+# ========================================
+
+class RFPDocument(db.Model):
+    __tablename__ = 'rfp_documents'
+
+    id = db.Column(db.String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    filename = db.Column(db.String(500), nullable=False)
+    original_name = db.Column(db.String(500), nullable=False)
+    document_type = db.Column(db.String(100), nullable=False)  # 'primary', 'addendum', 'technical_spec'
+    mime_type = db.Column(db.String(100))
+    file_size = db.Column(db.Integer)
+    file_path = db.Column(db.String(1000))
+    extracted_text = db.Column(db.Text)
+    processing_status = db.Column(db.String(50), default='pending')
+    page_count = db.Column(db.Integer)
+    language = db.Column(db.String(10), default='en')
+    has_images = db.Column(db.Boolean, default=False)
+    has_charts = db.Column(db.Boolean, default=False)
+    has_tables = db.Column(db.Boolean, default=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime)
+    meta_data = db.Column(db.JSON, default={})
+
+    # Relationships
+    key_points = db.relationship('KeyPoint', backref='rfp_document', lazy=True, cascade='all, delete-orphan')
+
+class KeyPoint(db.Model):
+    __tablename__ = 'key_points'
+
+    id = db.Column(db.String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(db.String(255), db.ForeignKey('rfp_documents.id'), nullable=False)
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(100), nullable=False)  # 'requirement', 'constraint', 'deadline', etc.
+    priority = db.Column(db.String(50), nullable=False)  # 'critical', 'high', 'medium', 'low'
+    page = db.Column(db.Integer)
+    section = db.Column(db.String(255))
+    confidence = db.Column(db.Numeric(3, 2))
+    is_consolidated = db.Column(db.Boolean, default=False)
+    parent_key_point_id = db.Column(db.String(255))
+    extracted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    relationships = db.Column(db.JSON, default=[])
+    tags = db.Column(db.JSON, default=[])
+    meta_data = db.Column(db.JSON, default={})
+
+class ConsolidatedKeyPoint(db.Model):
+    __tablename__ = 'consolidated_key_points'
+
+    id = db.Column(db.String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(100), nullable=False)
+    priority = db.Column(db.String(50), nullable=False)
+    source_document_ids = db.Column(db.JSON, default=[])
+    source_key_point_ids = db.Column(db.JSON, default=[])
+    final_decision = db.Column(db.Text)
+    reasoning = db.Column(db.Text)
+    confidence = db.Column(db.Numeric(3, 2))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Conflict(db.Model):
+    __tablename__ = 'conflicts'
+
+    id = db.Column(db.String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    conflict_type = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    conflicting_key_point_ids = db.Column(db.JSON, default=[])
+    resolution_strategy = db.Column(db.String(100))
+    resolved_value = db.Column(db.Text)
+    resolution_reasoning = db.Column(db.Text)
+    status = db.Column(db.String(50), default='pending')
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class MissingInformation(db.Model):
+    __tablename__ = 'missing_information'
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    importance = db.Column(db.String(50), nullable=False)
+    suggested_questions = db.Column(db.JSON, default=[])
+    status = db.Column(db.String(50), default='pending')
+    clarification = db.Column(db.Text)
+    clarified_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ========================================
+# ORIGINAL DOCUMENT MODELS (Legacy Support)
+# ========================================
+
 class Document(db.Model):
-    """Document model"""
     __tablename__ = 'documents'
 
     id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(500), nullable=False)
-    file_path = db.Column(db.String(1000), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)  # Added for compatibility
+    file_path = db.Column(db.String(500))
+    file_type = db.Column(db.String(50))
     file_size = db.Column(db.Integer)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    file_hash = db.Column(db.String(255))  # Added for original functionality
+    mime_type = db.Column(db.String(100))  # Added for original functionality
+    content = db.Column(db.Text)
+    status = db.Column(db.String(50), default='uploaded')
+    processing_status = db.Column(db.String(50), default='uploaded')  # Added for compatibility
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'))  # Added for original functionality
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))  # Added for original functionality
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime)
+    meta_data = db.Column(db.JSON, default={})
 
     # Relationships
-    project = db.relationship('Project', backref='documents')
-    uploader = db.relationship('User', backref='uploaded_documents')
+    requirements = db.relationship('Requirement', foreign_keys='Requirement.document_id', backref='document', lazy=True)
 
     def __repr__(self):
         return f'<Document {self.filename}>'
+
+class Requirement(db.Model):
+    __tablename__ = 'requirements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    requirement_id = db.Column(db.String(100), unique=True)  # Added for original functionality
+    title = db.Column(db.String(500))  # Added for original functionality
+    description = db.Column(db.Text)  # Added for original functionality
+    requirement_type = db.Column(db.String(100))  # Added for original functionality
+    complexity = db.Column(db.String(50))  # Added for original functionality
+    estimated_effort = db.Column(db.Integer)  # Added for original functionality
+    dependencies = db.Column(db.JSON, default=[])  # Added for original functionality
+    conflicts_with = db.Column(db.JSON, default=[])  # Added for original functionality
+    acceptance_criteria = db.Column(db.Text)  # Added for original functionality
+
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'))
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'))  # Added for original functionality
+    content = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(100))  # functional, non-functional, etc.
+    priority = db.Column(db.String(50))  # high, medium, low
+    category = db.Column(db.String(100))
+    confidence_score = db.Column(db.Float)
+    extracted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(50), default='identified')
+    tags = db.Column(db.JSON, default=[])
+    meta_data = db.Column(db.JSON, default={})
+
+# ========================================
+# AGENT SYSTEM MODELS (Original)
+# ========================================
+
+class Agent(db.Model):
+    __tablename__ = 'agents'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    type = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(50), default='active')
+    capabilities = db.Column(db.JSON, default=[])
+    config = db.Column(db.JSON, default={})
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tasks = db.relationship('AgentTask', foreign_keys='AgentTask.agent_id', backref='agent', lazy=True)
+    messages = db.relationship('AgentMessage', backref='agent', lazy=True)
+
+class AgentTask(db.Model):
+    __tablename__ = 'agent_tasks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.String(100), unique=True, default=lambda: str(uuid.uuid4()))  # Added for original functionality
+    title = db.Column(db.String(500))  # Added for original functionality
+    description = db.Column(db.Text)  # Added for original functionality
+    input_data = db.Column(db.JSON, default={})  # Added for original functionality
+
+    agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=False)
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'))  # Added for original functionality
+    task_type = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(50), default='pending')
+    priority = db.Column(db.String(20), default='medium')
+    payload = db.Column(db.JSON, default={})
+    result = db.Column(db.JSON, default={})
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+
+class AgentMessage(db.Model):
+    __tablename__ = 'agent_messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=False)
+    message_type = db.Column(db.String(50), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    meta_data = db.Column(db.JSON, default={})
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    level = db.Column(db.String(20), nullable=False)  # INFO, WARNING, ERROR, DEBUG
+    message = db.Column(db.Text, nullable=False)
+    module = db.Column(db.String(100))
+    function = db.Column(db.String(100))
+    line_number = db.Column(db.Integer)
+    extra_data = db.Column(db.JSON, default={})
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ========================================
+# DATABASE INITIALIZATION FUNCTIONS
+# ========================================
 
 def create_admin_user_safely():
     """Create admin user with proper error handling"""
@@ -151,6 +377,45 @@ def create_admin_user_safely():
         db.session.rollback()
         return False
 
+def create_sample_agents():
+    """Create sample agents for the system"""
+    try:
+        # Check if agents already exist
+        if Agent.query.count() > 0:
+            print("✅ Agents already exist")
+            return True
+
+        agents_data = [
+            {
+                'name': 'Document Intelligence',
+                'type': 'document_analysis',
+                'capabilities': ['pdf_parsing', 'text_extraction', 'requirement_identification']
+            },
+            {
+                'name': 'Requirements Engineering',
+                'type': 'requirements_analysis',
+                'capabilities': ['requirement_extraction', 'classification', 'prioritization']
+            }
+        ]
+
+        for agent_data in agents_data:
+            agent = Agent(
+                name=agent_data['name'],
+                type=agent_data['type'],
+                capabilities=agent_data['capabilities'],
+                status='online'
+            )
+            db.session.add(agent)
+
+        db.session.commit()
+        print("✅ Sample agents created successfully")
+        return True
+
+    except Exception as e:
+        print(f"❌ Agent creation failed: {e}")
+        db.session.rollback()
+        return False
+
 def init_db(app):
     """Initialize database with app context"""
     with app.app_context():
@@ -161,6 +426,9 @@ def init_db(app):
 
             # Create/fix admin user
             create_admin_user_safely()
+
+            # Create sample agents
+            create_sample_agents()
 
             return True
 

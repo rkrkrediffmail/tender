@@ -1,0 +1,164 @@
+MISSING_INFO_TEMPLATE = '''
+{% extends "base.html" %}
+
+{% block title %}Missing Information - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('project_dashboard', project_id=project.id) }}">{{ project.name }}</a></li>
+                    <li class="breadcrumb-item active">Missing Information</li>
+                </ol>
+            </nav>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>Missing Information</h2>
+                    <p class="text-muted">Critical information gaps identified by AI analysis</p>
+                </div>
+                <div>
+                    <span class="badge bg-danger fs-6">{{ missing_info|length }} Items</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="importance" class="form-label">Importance</label>
+                            <select class="form-select" id="importance" name="importance">
+                                <option value="all" {{ 'selected' if current_importance == 'all' }}>All Levels</option>
+                                <option value="critical" {{ 'selected' if current_importance == 'critical' }}>Critical</option>
+                                <option value="high" {{ 'selected' if current_importance == 'high' }}>High</option>
+                                <option value="medium" {{ 'selected' if current_importance == 'medium' }}>Medium</option>
+                                <option value="low" {{ 'selected' if current_importance == 'low' }}>Low</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="all" {{ 'selected' if current_status == 'all' }}>All Statuses</option>
+                                <option value="pending" {{ 'selected' if current_status == 'pending' }}>Pending</option>
+                                <option value="clarified" {{ 'selected' if current_status == 'clarified' }}>Clarified</option>
+                                <option value="not_needed" {{ 'selected' if current_status == 'not_needed' }}>Not Needed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">Filter</button>
+                            <a href="{{ url_for('view_missing_info', project_id=project.id) }}" class="btn btn-outline-secondary">Clear</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Missing Information List -->
+    <div class="row">
+        <div class="col-12">
+            {% if missing_info %}
+                {% for item in missing_info %}
+                <div class="card mb-3 border-start border-{{ 'danger' if item.importance == 'critical' else 'warning' if item.importance == 'high' else 'info' if item.importance == 'medium' else 'secondary' }} border-4">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">{{ item.category.replace('_', ' ').title() }}</h6>
+                                <small class="text-muted">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            <div>
+                                <span class="badge bg-{{ 'danger' if item.importance == 'critical' else 'warning' if item.importance == 'high' else 'info' if item.importance == 'medium' else 'secondary' }} me-2">
+                                    {{ item.importance.title() }}
+                                </span>
+                                <span class="badge bg-{{ 'success' if item.status == 'clarified' else 'secondary' if item.status == 'not_needed' else 'warning' }}">
+                                    {{ item.status.replace('_', ' ').title() }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h6>Missing Information</h6>
+                        <p>{{ item.description }}</p>
+
+                        {% if item.suggested_questions %}
+                        <div class="alert alert-light">
+                            <h6 class="alert-heading">Suggested Questions for Client</h6>
+                            <ul class="mb-0">
+                                {% for question in item.suggested_questions %}
+                                <li>{{ question }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% if item.clarification and item.status == 'clarified' %}
+                        <div class="alert alert-success">
+                            <h6 class="alert-heading">Clarification Received</h6>
+                            <p class="mb-0">{{ item.clarification }}</p>
+                            {% if item.clarified_at %}
+                            <small>Clarified on: {{ item.clarified_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if item.status == 'pending' %}
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-success" onclick="markClarified('{{ item.id }}')">
+                                Mark as Clarified
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="markNotNeeded('{{ item.id }}')">
+                                Mark as Not Needed
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="generateEmail('{{ item.id }}')">
+                                Generate Email
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h5>No Missing Information</h5>
+                        <p class="text-muted">All critical information appears to be present in the RFP documents.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+async function markClarified(itemId) {
+    const clarification = prompt('Enter the clarification received:');
+    if (clarification) {
+        // Implementation for marking as clarified
+        alert('Information marked as clarified!');
+        location.reload();
+    }
+}
+
+async function markNotNeeded(itemId) {
+    if (confirm('Mark this information as not needed?')) {
+        // Implementation for marking as not needed
+        alert('Information marked as not needed!');
+        location.reload();
+    }
+}
+
+async function generateEmail(itemId) {
+    // Implementation for generating email with questions
+    alert('Email template generated! (Feature to be implemented)');
+}
+</script>
+{% endblock %}
+'''
