@@ -11,6 +11,9 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from dotenv import load_dotenv
 from real_analysis_system import get_real_analysis_results, get_real_document_analysis
+from models import Partner, PartnerProduct, PartnerRecommendation
+from agents.partner_recommendation_agent import PartnerRecommendationAgent
+
 
 # Load environment variables
 load_dotenv()
@@ -152,7 +155,7 @@ def create_app():
             <style>
                 body {
                     font-family: Arial, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    /*background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);*/
                     min-height: 100vh;
                     display: flex;
                     align-items: center;
@@ -264,7 +267,7 @@ def create_app():
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     margin: 0;
                     padding: 20px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    /*background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);*/
                     min-height: 100vh;
                 }
                 .container {
@@ -297,7 +300,7 @@ def create_app():
                     transition: background 0.3s;
                 }
                 .nav a:hover { background: #e9ecef; }
-                .nav a.active { background: #007bff; color: white; }
+                .nav a.active { background: #667eea; color: white; }
                 .content { padding: 30px; }
                 .btn {
                     display: inline-block;
@@ -357,17 +360,17 @@ def create_app():
                     <a href="/" class="active">🏠 Dashboard</a>
                     <a href="/projects">📁 My Projects</a>
                     <a href="/upload">📄 Upload Documents</a>
+                    <a href="/settings/partners">🤝 Partner Management</a>
                     <a href="/health">🔍 System Health</a>
                 </div>
-
                 <div class="content">
                     {% if system_status.ready_for_upload %}
-                    <div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 5px solid #28a745; margin-bottom: 20px;">
+                    <!--div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 5px solid #28a745; margin-bottom: 20px;">
                         <h2>🎉 System Ready!</h2>
                         <p>All components are working. You can start uploading and analyzing documents!</p>
                         <a href="/projects" class="btn btn-success">📁 Go to Projects</a>
                         <a href="/upload" class="btn btn-success">📄 Upload Documents</a>
-                    </div>
+                    </div-->
                     {% else %}
                     <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 5px solid #ffc107; margin-bottom: 20px;">
                         <h2>⚙️ System Setup</h2>
@@ -677,6 +680,636 @@ def create_app():
         </body>
         </html>
         ''', project=project, documents=documents)
+
+
+# ========================================
+# PARTNER MANAGEMENT ROUTES
+# ========================================
+
+    @app.route('/settings/partners')
+    @login_required
+    def partner_settings():
+        """Partner management settings page"""
+        try:
+            from models import Partner
+            partners = Partner.query.order_by(Partner.name).all()
+        except Exception as e:
+            partners = []
+            flash(f"Error loading partners: {e}")
+
+        return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Partner Management - Tender Analysis System</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
+                .btn:hover { background: #5a6fd8; }
+                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+                .partner-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin: 20px 0; }
+                .partner-card {
+                    background: #f8f9fa;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    padding: 20px;
+                    transition: transform 0.2s;
+                }
+                .partner-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .partner-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+                .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+                .status-active { background: #d4edda; color: #155724; }
+                .status-preferred { background: #cce5ff; color: #004085; }
+                .status-inactive { background: #f8d7da; color: #721c24; }
+                .partner-stats { display: flex; justify-content: space-around; margin: 15px 0; }
+                .stat { text-align: center; }
+                .stat-number { font-size: 1.5em; font-weight: bold; color: #667eea; }
+                .partner-actions { display: flex; gap: 10px; margin-top: 15px; }
+                .no-partners { text-align: center; padding: 60px; color: #6c757d; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>🤝 Partner Management</h1>
+                        <p style="color: #6c757d;">Manage partner companies and their products for cross-sell opportunities</p>
+                    </div>
+                    <div>
+                        <a href="/" class="btn">← Dashboard</a>
+                        <a href="/settings/partners/add" class="btn btn-success">+ Add Partner</a>
+                    </div>
+                </div>
+
+                {% if partners %}
+                <div class="partner-grid">
+                    {% for partner in partners %}
+                    <div class="partner-card">
+                        <div class="partner-header">
+                            <h4 style="margin: 0;">{{ partner.name }}</h4>
+                            <span class="status-badge status-{{ partner.status.lower() }}">
+                                {{ partner.status }}
+                            </span>
+                        </div>
+
+                        <p style="color: #6c757d; margin: 10px 0;">
+                            {{ partner.description or 'No description available' }}
+                        </p>
+
+                        <div class="partner-stats">
+                            <div class="stat">
+                                <div class="stat-number">{{ partner.products|length }}</div>
+                                <small>Products</small>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number">{{ partner.company_type }}</div>
+                                <small>Type</small>
+                            </div>
+                        </div>
+
+                        {% if partner.contact_email %}
+                        <p style="font-size: 14px; margin: 10px 0;">
+                            <i>📧</i> {{ partner.contact_email }}
+                        </p>
+                        {% endif %}
+
+                        {% if partner.website %}
+                        <p style="font-size: 14px; margin: 10px 0;">
+                            <i>🌐</i> <a href="{{ partner.website }}" target="_blank">{{ partner.website }}</a>
+                        </p>
+                        {% endif %}
+
+                        <div class="partner-actions">
+                            <a href="/settings/partners/{{ partner.id }}/products" class="btn" style="flex: 1; text-align: center;">
+                                📦 Products ({{ partner.products|length }})
+                            </a>
+                            <button class="btn" style="background: #6c757d;">
+                                ✏️ Edit
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-partners">
+                    <h3>🤝 No Partners Yet</h3>
+                    <p>Start building your partner ecosystem by adding your first technology partner.</p>
+                    <a href="/settings/partners/add" class="btn btn-success">+ Add First Partner</a>
+                </div>
+                {% endif %}
+
+                <div style="margin-top: 40px; padding: 20px; background: #e3f2fd; border-radius: 8px;">
+                    <h4>ℹ️ About Partner Management</h4>
+                    <p>Partner management enables AI-powered cross-sell recommendations during proposal generation. The system analyzes project requirements and suggests relevant partner products that complement your solutions.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ''', partners=partners)
+
+    @app.route('/settings/partners/add', methods=['GET', 'POST'])
+    @login_required
+    def add_partner():
+        """Add new partner"""
+        if request.method == 'POST':
+            try:
+                from models import Partner
+
+                partner = Partner(
+                    name=request.form['name'],
+                    company_type=request.form['company_type'],
+                    status=request.form['status'],
+                    description=request.form.get('description'),
+                    website=request.form.get('website'),
+                    primary_contact=request.form.get('primary_contact'),
+                    contact_email=request.form.get('contact_email'),
+                    contact_phone=request.form.get('contact_phone'),
+                    revenue_share_percentage=float(request.form.get('revenue_share', 0) or 0),
+                    discount_level=float(request.form.get('discount_level', 0) or 0),
+                    support_level=request.form['support_level']
+                )
+
+                db.session.add(partner)
+                db.session.commit()
+
+                flash('Partner added successfully!', 'success')
+                return redirect('/settings/partners')
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error adding partner: {str(e)}', 'error')
+
+        return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Add Partner - Tender Analysis System</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
+                .btn:hover { background: #5a6fd8; }
+                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+                .form-group { margin: 20px 0; }
+                .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                label { display: block; margin-bottom: 5px; font-weight: bold; }
+                input, select, textarea {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    box-sizing: border-box;
+                }
+                .help-card { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>➕ Add New Partner</h1>
+                        <p style="color: #6c757d;">Add a technology partner to your ecosystem</p>
+                    </div>
+                    <a href="/settings/partners" class="btn">← Back to Partners</a>
+                </div>
+
+                <form method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="name">Company Name *</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="company_type">Partner Type *</label>
+                            <select id="company_type" name="company_type" required>
+                                <option value="">Select Type</option>
+                                <option value="STRATEGIC">Strategic Partner</option>
+                                <option value="TECHNOLOGY">Technology Partner</option>
+                                <option value="VENDOR">Vendor</option>
+                                <option value="INTEGRATION">Integration Partner</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="status">Status *</label>
+                            <select id="status" name="status" required>
+                                <option value="ACTIVE">Active</option>
+                                <option value="PREFERRED">Preferred</option>
+                                <option value="INACTIVE">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="website">Website</label>
+                            <input type="url" id="website" name="website" placeholder="https://example.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" rows="3" placeholder="Brief description of the partner company"></textarea>
+                    </div>
+
+                    <h4 style="margin-top: 30px;">Contact Information</h4>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="primary_contact">Primary Contact</label>
+                            <input type="text" id="primary_contact" name="primary_contact">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact_email">Email</label>
+                            <input type="email" id="contact_email" name="contact_email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contact_phone">Phone</label>
+                        <input type="tel" id="contact_phone" name="contact_phone">
+                    </div>
+
+                    <h4 style="margin-top: 30px;">Business Terms</h4>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="revenue_share">Revenue Share (%)</label>
+                            <input type="number" id="revenue_share" name="revenue_share" min="0" max="100" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="discount_level">Discount Level (%)</label>
+                            <input type="number" id="discount_level" name="discount_level" min="0" max="100" step="0.1">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="support_level">Support Level</label>
+                        <select id="support_level" name="support_level">
+                            <option value="BASIC">Basic</option>
+                            <option value="PREMIUM">Premium</option>
+                            <option value="ENTERPRISE">Enterprise</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 30px;">
+                        <a href="/settings/partners" class="btn" style="background: #6c757d;">Cancel</a>
+                        <button type="submit" class="btn btn-success" style="flex: 1;">💾 Add Partner</button>
+                    </div>
+                </form>
+
+                <div class="help-card">
+                    <h4>💡 Partner Types</h4>
+                    <ul>
+                        <li><strong>Strategic:</strong> Long-term partnerships with shared goals</li>
+                        <li><strong>Technology:</strong> Software/hardware solution providers</li>
+                        <li><strong>Vendor:</strong> Service or product suppliers</li>
+                        <li><strong>Integration:</strong> System integration specialists</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        ''')
+
+    @app.route('/settings/partners/<int:partner_id>/products')
+    @login_required
+    def partner_products(partner_id):
+        """Manage products for a specific partner"""
+        try:
+            from models import Partner
+            partner = Partner.query.get_or_404(partner_id)
+        except Exception as e:
+            flash(f"Error loading partner: {e}")
+            return redirect('/settings/partners')
+
+        return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>{{ partner.name }} Products - Tender Analysis System</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
+                .btn:hover { background: #5a6fd8; }
+                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+                .partner-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+                .product-card {
+                    background: #f8f9fa;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    padding: 20px;
+                    transition: transform 0.2s;
+                }
+                .product-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .product-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; }
+                .category-badge { padding: 4px 8px; background: #1f4397; color: white; border-radius: 12px; font-size: 12px; }
+                .complexity-badge { padding: 2px 6px; border-radius: 8px; font-size: 11px; font-weight: bold; }
+                .complexity-low { background: #d4edda; color: #155724; }
+                .complexity-medium { background: #fff3cd; color: #856404; }
+                .complexity-high { background: #f8d7da; color: #721c24; }
+                .product-tags { margin: 10px 0; }
+                .tag { display: inline-block; background: #e9ecef; color: #495057; padding: 2px 8px; margin: 2px; border-radius: 10px; font-size: 12px; }
+                .product-actions { display: flex; gap: 10px; margin-top: 15px; }
+                .no-products { text-align: center; padding: 60px; color: #6c757d; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>📦 {{ partner.name }} Products</h1>
+                        <p style="color: #6c757d;">Manage products and services for {{ partner.name }}</p>
+                    </div>
+                    <div>
+                        <a href="/settings/partners" class="btn">← Back to Partners</a>
+                        <a href="/settings/partners/{{ partner.id }}/products/add" class="btn btn-success">+ Add Product</a>
+                    </div>
+                </div>
+
+                <div class="partner-info">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin: 0;">{{ partner.name }}</h4>
+                            <p style="margin: 5px 0; color: #666;">{{ partner.description or 'No description available' }}</p>
+                        </div>
+                        <div>
+                            <span class="category-badge">{{ partner.company_type }}</span>
+                            <span style="margin-left: 10px; color: #28a745; font-weight: bold;">{{ partner.status }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if partner.products %}
+                <div class="product-grid">
+                    {% for product in partner.products %}
+                    <div class="product-card">
+                        <div class="product-header">
+                            <h5 style="margin: 0;">{{ product.product_name }}</h5>
+                            <span class="category-badge">{{ product.category }}</span>
+                        </div>
+
+                        <p style="color: #6c757d; font-size: 14px; margin: 10px 0;">
+                            {{ product.functionality[:120] }}{% if product.functionality|length > 120 %}...{% endif %}
+                        </p>
+
+                        <div style="margin: 15px 0;">
+                            <span class="complexity-badge complexity-{{ product.integration_complexity.lower() }}">
+                                {{ product.integration_complexity }} Integration
+                            </span>
+                            <span style="margin-left: 10px; font-size: 12px; color: #666;">
+                                {% if product.api_available %}✅ API{% else %}❌ No API{% endif %}
+                                {% if product.cloud_native %}| ☁️ Cloud{% endif %}
+                            </span>
+                        </div>
+
+                        {% if product.technical_keywords %}
+                        <div class="product-tags">
+                            {% for keyword in product.technical_keywords[:4] %}
+                            <span class="tag">{{ keyword }}</span>
+                            {% endfor %}
+                            {% if product.technical_keywords|length > 4 %}
+                            <span style="font-size: 12px; color: #666;">+{{ product.technical_keywords|length - 4 }} more</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div style="font-size: 12px; color: #666; margin: 10px 0;">
+                            <strong>Implementation:</strong> {{ product.implementation_time or 'TBD' }}
+                            <br><strong>Pricing:</strong> {{ product.pricing_type }}
+                        </div>
+
+                        <div class="product-actions">
+                            <button class="btn" style="flex: 1;">👁️ View Details</button>
+                            <button class="btn" style="background: #6c757d;">✏️ Edit</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-products">
+                    <h3>📦 No Products Yet</h3>
+                    <p>Add the first product for {{ partner.name }} to enable AI recommendations.</p>
+                    <a href="/settings/partners/{{ partner.id }}/products/add" class="btn btn-success">+ Add First Product</a>
+                </div>
+                {% endif %}
+            </div>
+        </body>
+        </html>
+        ''', partner=partner)
+
+    @app.route('/settings/partners/<int:partner_id>/products/add', methods=['GET', 'POST'])
+    @login_required
+    def add_partner_product(partner_id):
+        """Add product to partner"""
+        try:
+            from models import Partner
+            partner = Partner.query.get_or_404(partner_id)
+        except Exception as e:
+            flash(f"Error loading partner: {e}")
+            return redirect('/settings/partners')
+
+        if request.method == 'POST':
+            try:
+                from models import PartnerProduct
+
+                # Parse JSON fields
+                supported_platforms = [p.strip() for p in request.form.get('supported_platforms', '').split(',') if p.strip()]
+                security_certs = [c.strip() for c in request.form.get('security_certifications', '').split(',') if c.strip()]
+                tech_keywords = [k.strip() for k in request.form.get('technical_keywords', '').split(',') if k.strip()]
+                industry_fit = [i.strip() for i in request.form.get('industry_fit', '').split(',') if i.strip()]
+
+                product = PartnerProduct(
+                    partner_id=partner_id,
+                    product_name=request.form['product_name'],
+                    category=request.form['category'],
+                    functionality=request.form['functionality'],
+                    integration_complexity=request.form['integration_complexity'],
+                    api_available=bool(request.form.get('api_available')),
+                    cloud_native=bool(request.form.get('cloud_native')),
+                    supported_platforms=supported_platforms,
+                    security_certifications=security_certs,
+                    pricing_type=request.form['pricing_type'],
+                    implementation_time=request.form.get('implementation_time'),
+                    maintenance_required=bool(request.form.get('maintenance_required')),
+                    technical_keywords=tech_keywords,
+                    industry_fit=industry_fit
+                )
+
+                db.session.add(product)
+                db.session.commit()
+
+                flash('Product added successfully!', 'success')
+                return redirect(f'/settings/partners/{partner_id}/products')
+
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error adding product: {str(e)}', 'error')
+
+        return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Add Product - {{ partner.name }} - Tender Analysis System</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
+                .btn:hover { background: #5a6fd8; }
+                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+                .form-section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+                .form-group { margin: 15px 0; }
+                .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+                label { display: block; margin-bottom: 5px; font-weight: bold; }
+                input, select, textarea {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    box-sizing: border-box;
+                }
+                .checkbox-group { display: flex; gap: 20px; }
+                .checkbox-item { display: flex; align-items: center; }
+                .checkbox-item input { width: auto; margin-right: 8px; }
+                .help-text { font-size: 12px; color: #6c757d; margin-top: 5px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>➕ Add Product to {{ partner.name }}</h1>
+                        <p style="color: #6c757d;">Define a new product or service offering</p>
+                    </div>
+                    <a href="/settings/partners/{{ partner.id }}/products" class="btn">← Back to Products</a>
+                </div>
+
+                <form method="POST">
+                    <div class="form-section">
+                        <h4>Basic Information</h4>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="product_name">Product Name *</label>
+                                <input type="text" id="product_name" name="product_name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="category">Category *</label>
+                                <select id="category" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="AUTHENTICATION">Authentication & Security</option>
+                                    <option value="PAYMENT">Payment Processing</option>
+                                    <option value="ANALYTICS">Analytics & Reporting</option>
+                                    <option value="MESSAGING">Messaging & Communication</option>
+                                    <option value="STORAGE">Data Storage</option>
+                                    <option value="AI_ML">AI & Machine Learning</option>
+                                    <option value="INTEGRATION">Integration & APIs</option>
+                                    <option value="MONITORING">Monitoring & Logging</option>
+                                    <option value="CRM">Customer Relationship Management</option>
+                                    <option value="ERP">Enterprise Resource Planning</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="pricing_type">Pricing Model</label>
+                                <select id="pricing_type" name="pricing_type">
+                                    <option value="SUBSCRIPTION">Subscription</option>
+                                    <option value="LICENSE">License</option>
+                                    <option value="TRANSACTION">Per Transaction</option>
+                                    <option value="USAGE">Usage-based</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="functionality">Functionality Description *</label>
+                            <textarea id="functionality" name="functionality" rows="3" required placeholder="Describe what this product does and its key capabilities"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4>Technical Specifications</h4>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="integration_complexity">Integration Complexity</label>
+                                <select id="integration_complexity" name="integration_complexity">
+                                    <option value="LOW">Low - Simple configuration</option>
+                                    <option value="MEDIUM" selected>Medium - Moderate setup</option>
+                                    <option value="HIGH">High - Complex integration</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="implementation_time">Implementation Time</label>
+                                <input type="text" id="implementation_time" name="implementation_time" placeholder="e.g., 2-4 weeks">
+                            </div>
+                            <div class="form-group">
+                                <label>Features</label>
+                                <div class="checkbox-group">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="api_available" name="api_available" checked>
+                                        <label for="api_available">API Available</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="cloud_native" name="cloud_native" checked>
+                                        <label for="cloud_native">Cloud Native</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="maintenance_required" name="maintenance_required" checked>
+                                        <label for="maintenance_required">Maintenance Required</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="supported_platforms">Supported Platforms</label>
+                                <input type="text" id="supported_platforms" name="supported_platforms" placeholder="web, mobile, api, desktop">
+                                <div class="help-text">Enter platforms separated by commas</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="security_certifications">Security Certifications</label>
+                                <input type="text" id="security_certifications" name="security_certifications" placeholder="SO
+                               <div class="help-text">Enter certifications separated by commas</div>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div class="form-section">
+                       <h4>AI Matching Configuration</h4>
+
+                       <div class="form-group">
+                           <label for="technical_keywords">Technical Keywords</label>
+                           <input type="text" id="technical_keywords" name="technical_keywords" placeholder="authentication, oauth, sso, security">
+                           <div class="help-text">Keywords that help AI match this product to project requirements</div>
+                       </div>
+
+                       <div class="form-group">
+                           <label for="industry_fit">Industry Fit</label>
+                           <input type="text" id="industry_fit" name="industry_fit" placeholder="healthcare, banking, retail, fintech">
+                           <div class="help-text">Industries where this product is commonly used</div>
+                       </div>
+                   </div>
+
+                   <div style="display: flex; gap: 10px; margin-top: 30px;">
+                       <a href="/settings/partners/{{ partner.id }}/products" class="btn" style="background: #6c757d;">Cancel</a>
+                       <button type="submit" class="btn btn-success" style="flex: 1;">💾 Add Product</button>
+                   </div>
+               </form>
+           </div>
+       </body>
+       </html>
+       ''', partner=partner)
+
+   # Add navigation link to partner management in the main navigation
+   # You'll need to modify your dashboard template to include a link to /settings/partners
 
     # ========================================
     # DOCUMENT UPLOAD & PROCESSING
@@ -1049,7 +1682,7 @@ def create_app():
                                     <button onclick="window.location.href='/projects'" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; margin-right: 10px; cursor: pointer;">
                                         📊 View Project Dashboard
                                     </button>
-                                    <button onclick="window.location.href='/analysis/${projectId}'" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer;">
+                                    <button onclick="window.location.href='/analysis/${projectId}'" style="background: #1f4397; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer;">
                                         🤖 Run AI Analysis
                                     </button>
                                 </div>
@@ -1654,6 +2287,9 @@ def create_app():
                 </div>
 
                  <div style="text-align: center; margin-top: 30px;">
+                 <a href="/projects/{{ project.id }}/partner-recommendations" class="btn" style="background: #1f4397; padding: 15px 30px; font-size: 16px; margin-right: 10px;">
+                    🤝 Select Partner Products
+                </a>
                 <a href="/generate-proposal/{{ project.id }}" class="btn" style="background: #28a745; padding: 15px 30px; font-size: 16px;">
                     📝 Generate Proposal Document
                 </a>
@@ -1737,7 +2373,7 @@ def create_app():
                 .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
                 .btn:hover { background: #5a6fd8; }
                 .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .btn-primary { background: #007bff; } .btn-primary:hover { background: #0056b3; }
+                .btn-primary { background: #1f4397; } .btn-primary:hover { background: #0056b3; }
                 .btn-warning { background: #ffc107; color: #212529; } .btn-warning:hover { background: #e0a800; }
                 .deliverable-card {
                     background: #f8f9fa;
@@ -1748,13 +2384,13 @@ def create_app():
                     transition: all 0.3s;
                 }
                 .deliverable-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-                .deliverable-card.selected { border-color: #007bff; background: #e3f2fd; }
+                .deliverable-card.selected { border-color: #1f4397; background: #e3f2fd; }
                 .deliverable-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
                 .checkbox-container { display: flex; align-items: center; margin-bottom: 15px; }
                 .checkbox-container input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
                 .progress-section { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
                 .progress-bar { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; }
-                .progress-fill { height: 100%; background: #007bff; width: 0%; transition: width 0.5s; }
+                .progress-fill { height: 100%; background: #1f4397; width: 0%; transition: width 0.5s; }
                 .download-section { background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
             </style>
         </head>
@@ -2452,6 +3088,371 @@ def create_app():
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    # ========================================
+    # PARTNER RECOMMENDATION & SELECTION
+    # ========================================
+
+    @app.route('/projects/<project_id>/partner-recommendations')
+    @login_required
+    def view_partner_recommendations(project_id):
+        """View and select partner recommendations for a project"""
+        try:
+            from models import User, Project, Partner, PartnerProduct
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+
+            # Get analysis results for intelligent matching
+            analysis_results = get_real_analysis_results(project_id)
+
+            # Get all active partner products
+            partner_products = db.session.query(PartnerProduct).join(Partner).filter(
+                Partner.status == 'ACTIVE'
+            ).all()
+
+            # Simple keyword matching for recommendations
+            recommendations = []
+            for product in partner_products:
+                fit_score = calculate_simple_fit_score(analysis_results, product)
+                if fit_score > 30:  # Show products with some relevance
+                    recommendations.append({
+                        'product': product,
+                        'partner': product.partner,
+                        'fit_score': fit_score,
+                        'reasoning': generate_fit_reasoning(analysis_results, product),
+                        'estimated_cost': estimate_product_cost(product),
+                        'integration_scope': determine_integration_scope(fit_score)
+                    })
+
+            # Sort by fit score
+            recommendations.sort(key=lambda x: x['fit_score'], reverse=True)
+
+        except Exception as e:
+            flash(f"Error loading recommendations: {e}")
+            return redirect('/projects')
+
+        return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Partner Recommendations - {{ project.name }}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
+                .btn:hover { background: #5a6fd8; }
+                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+                .btn-warning { background: #ffc107; color: #212529; } .btn-warning:hover { background: #e0a800; }
+                .recommendations-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+                .recommendation-card {
+                    background: #f8f9fa;
+                    border: 1px solid #e9ecef;
+                    border-radius: 8px;
+                    padding: 20px;
+                    transition: all 0.3s;
+                    position: relative;
+                }
+                .recommendation-card.selected { border-color: #28a745; background: #d4edda; }
+                .recommendation-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .fit-score { position: absolute; top: 15px; right: 15px; background: #1f4397; color: white; padding: 5px 10px; border-radius: 15px; font-weight: bold; }
+                .fit-score.high { background: #28a745; }
+                .fit-score.medium { background: #ffc107; color: #212529; }
+                .fit-score.low { background: #dc3545; }
+                .product-header { margin-bottom: 15px; }
+                .product-header h5 { margin: 0; color: #495057; }
+                .product-header small { color: #6c757d; }
+                .integration-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin: 5px 0; }
+                .integration-core { background: #dc3545; color: white; }
+                .integration-addon { background: #1f4397; color: white; }
+                .integration-optional { background: #6c757d; color: white; }
+                .cost-info { background: white; padding: 10px; border-radius: 5px; margin: 10px 0; }
+                .reasoning-box { background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 14px; }
+                .selection-controls { margin-top: 15px; display: flex; gap: 10px; align-items: center; }
+                .checkbox-large { transform: scale(1.5); margin-right: 10px; }
+                .no-recommendations { text-align: center; padding: 60px; color: #6c757d; }
+                .summary-panel { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                .selected-count { background: #28a745; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; display: none; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>🤝 Partner Recommendations</h1>
+                        <p style="color: #6c757d;">AI-powered partner product suggestions for {{ project.name }}</p>
+                    </div>
+                    <div>
+                        <a href="/analysis/{{ project.id }}" class="btn">← Back to Analysis</a>
+                        <button id="proceedBtn" class="btn btn-success" onclick="proceedToProposal()" disabled>
+                            📝 Proceed to Proposal Generation
+                        </button>
+                    </div>
+                </div>
+
+                <div class="summary-panel">
+                    <h4>📊 Project Analysis Summary</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div><strong>Must-Have:</strong> {{ analysis_results.must_have_requirements|length }} requirements</div>
+                        <div><strong>Good-to-Have:</strong> {{ analysis_results.good_to_have_requirements|length }} requirements</div>
+                        <div><strong>Technical Specs:</strong> {{ analysis_results.technical_specifications|length }} specifications</div>
+                        <div><strong>Available Partners:</strong> {{ recommendations|length }} products found</div>
+                    </div>
+                </div>
+
+                <div id="selectedCount" class="selected-count">
+                    <strong>🎯 <span id="countText">0</span> partner products selected for proposal</strong>
+                </div>
+
+                {% if recommendations %}
+                <div class="recommendations-grid">
+                    {% for rec in recommendations %}
+                    <div class="recommendation-card" data-product-id="{{ rec.product.id }}">
+                        <div class="fit-score {{ 'high' if rec.fit_score >= 80 else 'medium' if rec.fit_score >= 60 else 'low' }}">
+                            {{ "%.0f"|format(rec.fit_score) }}%
+                        </div>
+
+                        <div class="product-header">
+                            <h5>{{ rec.product.product_name }}</h5>
+                            <small>by {{ rec.partner.name }} | {{ rec.product.category }}</small>
+                        </div>
+
+                        <p style="color: #6c757d; font-size: 14px; margin: 10px 0;">
+                            {{ rec.product.functionality[:150] }}{% if rec.product.functionality|length > 150 %}...{% endif %}
+                        </p>
+
+                        <div>
+                            <span class="integration-badge integration-{{ rec.integration_scope.lower() }}">
+                                {{ rec.integration_scope }} Integration
+                            </span>
+                            {% if rec.product.api_available %}
+                            <span style="color: #28a745; font-size: 12px;">✅ API Available</span>
+                            {% endif %}
+                            {% if rec.product.cloud_native %}
+                            <span style="color: #1f4397; font-size: 12px;">☁️ Cloud Native</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="cost-info">
+                            <strong>Estimated Cost:</strong> ${{ "{:,.0f}"|format(rec.estimated_cost) }}
+                            <br><strong>Implementation:</strong> {{ rec.product.implementation_time or 'TBD' }}
+                            <br><strong>Pricing:</strong> {{ rec.product.pricing_type }}
+                        </div>
+
+                        <div class="reasoning-box">
+                            <strong>🤖 AI Analysis:</strong><br>
+                            {{ rec.reasoning }}
+                        </div>
+
+                        <div class="selection-controls">
+                            <input type="checkbox" class="checkbox-large product-checkbox"
+                                   data-product-id="{{ rec.product.id }}"
+                                   data-partner-name="{{ rec.partner.name }}"
+                                   data-product-name="{{ rec.product.product_name }}"
+                                   data-cost="{{ rec.estimated_cost }}"
+                                   data-scope="{{ rec.integration_scope }}"
+                                   onchange="updateSelection()">
+                            <label><strong>Include in Proposal</strong></label>
+                            <button class="btn" style="margin-left: auto; padding: 5px 10px;" onclick="showDetails({{ rec.product.id }})">
+                                📋 View Details
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="no-recommendations">
+                    <h3>🔍 No Partner Recommendations Found</h3>
+                    <p>No partner products match your current project requirements.</p>
+                    <div style="margin-top: 20px;">
+                        <a href="/settings/partners" class="btn">🤝 Add More Partners</a>
+                        <a href="/analysis/{{ project.id }}" class="btn btn-warning">📊 Back to Analysis</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div style="margin-top: 40px; padding: 20px; background: #e3f2fd; border-radius: 8px;">
+                    <h4>ℹ️ How Partner Recommendations Work</h4>
+                    <ul>
+                        <li><strong>AI Analysis:</strong> System analyzes your project requirements against partner product capabilities</li>
+                        <li><strong>Fit Scoring:</strong> Each product gets a compatibility score (0-100%) based on technical and business fit</li>
+                        <li><strong>Integration Scope:</strong> Core (essential), Add-on (valuable), Optional (nice-to-have)</li>
+                        <li><strong>Cost Integration:</strong> Selected partner costs are included in final proposal pricing</li>
+                    </ul>
+                </div>
+            </div>
+
+            <script>
+            let selectedProducts = [];
+
+            function updateSelection() {
+                const checkboxes = document.querySelectorAll('.product-checkbox:checked');
+                selectedProducts = Array.from(checkboxes).map(cb => ({
+                    productId: cb.dataset.productId,
+                    partnerName: cb.dataset.partnerName,
+                    productName: cb.dataset.productName,
+                    cost: parseFloat(cb.dataset.cost),
+                    scope: cb.dataset.scope
+                }));
+
+                // Update selected count display
+                const countDisplay = document.getElementById('selectedCount');
+                const countText = document.getElementById('countText');
+                const proceedBtn = document.getElementById('proceedBtn');
+
+                if (selectedProducts.length > 0) {
+                    countText.textContent = selectedProducts.length;
+                    countDisplay.style.display = 'block';
+                    proceedBtn.disabled = false;
+                    proceedBtn.textContent = `📝 Generate Proposal with ${selectedProducts.length} Partner Products`;
+                } else {
+                    countDisplay.style.display = 'none';
+                    proceedBtn.disabled = false; // Allow proceeding without partners
+                    proceedBtn.textContent = '📝 Proceed to Proposal Generation';
+                }
+
+                // Update card styling
+                document.querySelectorAll('.recommendation-card').forEach(card => {
+                    const checkbox = card.querySelector('.product-checkbox');
+                    if (checkbox.checked) {
+                        card.classList.add('selected');
+                    } else {
+                        card.classList.remove('selected');
+                    }
+                });
+
+                console.log('Selected products:', selectedProducts);
+            }
+
+            function proceedToProposal() {
+                // Store selected partner products in session/localStorage for proposal generation
+                sessionStorage.setItem('selectedPartnerProducts', JSON.stringify(selectedProducts));
+
+                // Proceed to proposal generation with partner data
+                window.location.href = `/generate-proposal/{{ project.id }}?partners=${selectedProducts.length}`;
+            }
+
+            function showDetails(productId) {
+                // You can implement a modal or redirect to product details
+                alert(`Product details for ID: ${productId}`);
+            }
+
+            // Auto-select high-scoring products (optional)
+            document.addEventListener('DOMContentLoaded', function() {
+                const highScoreProducts = document.querySelectorAll('.fit-score.high');
+                highScoreProducts.forEach(scoreElement => {
+                    const card = scoreElement.closest('.recommendation-card');
+                    const checkbox = card.querySelector('.product-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
+                updateSelection();
+            });
+            </script>
+        </body>
+        </html>
+        ''', project=project, analysis_results=analysis_results, recommendations=recommendations)
+
+    # Helper functions for partner recommendations
+    def calculate_simple_fit_score(analysis_results, product):
+        """Calculate a simple fit score based on keyword matching"""
+        score = 0
+
+        # Combine all requirements text
+        all_requirements = []
+        all_requirements.extend(analysis_results.get('must_have_requirements', []))
+        all_requirements.extend(analysis_results.get('good_to_have_requirements', []))
+        all_requirements.extend(analysis_results.get('technical_specifications', []))
+
+        combined_text = ' '.join(all_requirements).lower()
+
+        # Check technical keywords
+        if product.technical_keywords:
+            for keyword in product.technical_keywords:
+                if keyword.lower() in combined_text:
+                    score += 15
+
+        # Check category relevance
+        category_keywords = {
+            'AUTHENTICATION': ['auth', 'login', 'security', 'user', 'identity'],
+            'PAYMENT': ['payment', 'billing', 'transaction', 'financial'],
+            'ANALYTICS': ['analytics', 'reporting', 'dashboard', 'data'],
+            'INTEGRATION': ['integration', 'api', 'connect', 'interface'],
+            'STORAGE': ['storage', 'database', 'data', 'backup'],
+            'AI_ML': ['ai', 'machine learning', 'artificial intelligence', 'ml']
+        }
+
+        if product.category in category_keywords:
+            for keyword in category_keywords[product.category]:
+                if keyword in combined_text:
+                    score += 10
+
+        # Bonus for API availability and cloud native
+        if product.api_available:
+            score += 5
+        if product.cloud_native:
+            score += 5
+
+        # Integration complexity penalty
+        if product.integration_complexity == 'HIGH':
+            score -= 10
+        elif product.integration_complexity == 'LOW':
+            score += 5
+
+        return min(score, 100)  # Cap at 100%
+
+    def generate_fit_reasoning(analysis_results, product):
+        """Generate reasoning for why this product fits"""
+        reasons = []
+
+        if product.technical_keywords:
+            matching_keywords = []
+            all_text = ' '.join(analysis_results.get('must_have_requirements', [])).lower()
+            for keyword in product.technical_keywords[:3]:
+                if keyword.lower() in all_text:
+                    matching_keywords.append(keyword)
+
+            if matching_keywords:
+                reasons.append(f"Matches key requirements: {', '.join(matching_keywords)}")
+
+        if product.api_available:
+            reasons.append("API integration enables seamless connectivity")
+
+        if product.cloud_native:
+            reasons.append("Cloud-native architecture aligns with modern infrastructure")
+
+        if product.integration_complexity == 'LOW':
+            reasons.append("Low integration complexity reduces implementation risk")
+
+        return '. '.join(reasons) if reasons else "General compatibility with project requirements"
+
+    def estimate_product_cost(product):
+        """Estimate integration cost for a product"""
+        base_costs = {
+            'LOW': 5000,
+            'MEDIUM': 15000,
+            'HIGH': 35000
+        }
+
+        base_cost = base_costs.get(product.integration_complexity, 15000)
+
+        # Adjust based on features
+        if not product.api_available:
+            base_cost *= 1.5
+        if product.maintenance_required:
+            base_cost *= 1.2
+
+        return base_cost
+
+    def determine_integration_scope(fit_score):
+        """Determine integration scope based on fit score"""
+        if fit_score >= 80:
+            return 'CORE'
+        elif fit_score >= 60:
+            return 'ADDON'
+        else:
+            return 'OPTIONAL'
 
     # ========================================
     # HEALTH & STATUS ENDPOINTS

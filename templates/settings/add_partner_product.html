@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Add Product - {{ partner.name }} - Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Add Product to {{ partner.name }}</h1>
+            <p class="text-muted">Define a new product or service offering</p>
+        </div>
+        <a href="{{ url_for('partner_products', partner_id=partner.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Products
+        </a>
+    </div>
+
+    <!-- Product Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Product Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Basic Information -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="product_name" class="form-label">Product Name *</label>
+                                <input type="text" class="form-control" id="product_name" name="product_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="category" class="form-label">Category *</label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="AUTHENTICATION">Authentication & Security</option>
+                                    <option value="PAYMENT">Payment Processing</option>
+                                    <option value="ANALYTICS">Analytics & Reporting</option>
+                                    <option value="MESSAGING">Messaging & Communication</option>
+                                    <option value="STORAGE">Data Storage</option>
+                                    <option value="AI_ML">AI & Machine Learning</option>
+                                    <option value="INTEGRATION">Integration & APIs</option>
+                                    <option value="MONITORING">Monitoring & Logging</option>
+                                    <option value="CRM">Customer Relationship Management</option>
+                                    <option value="ERP">Enterprise Resource Planning</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="functionality" class="form-label">Functionality Description *</label>
+                            <textarea class="form-control" id="functionality" name="functionality" rows="3" required placeholder="Describe what this product does and its key capabilities"></textarea>
+                        </div>
+
+                        <!-- Technical Specifications -->
+                        <h6 class="fw-bold mb-3 mt-4">Technical Specifications</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="integration_complexity" class="form-label">Integration Complexity</label>
+                                <select class="form-select" id="integration_complexity" name="integration_complexity">
+                                    <option value="LOW">Low - Simple configuration</option>
+                                    <option value="MEDIUM" selected>Medium - Moderate setup</option>
+                                    <option value="HIGH">High - Complex integration</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="pricing_type" class="form-label">Pricing Model</label>
+                                <select class="form-select" id="pricing_type" name="pricing_type">
+                                    <option value="SUBSCRIPTION" selected>Subscription</option>
+                                    <option value="LICENSE">License</option>
+                                    <option value="TRANSACTION">Per Transaction</option>
+                                    <option value="USAGE">Usage-based</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="implementation_time" class="form-label">Implementation Time</label>
+                                <input type="text" class="form-control" id="implementation_time" name="implementation_time" placeholder="e.g., 2-4 weeks">
+                            </div>
+                        </div>
+
+                        <!-- Feature Toggles -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="api_available" name="api_available" checked>
+                                    <label class="form-check-label" for="api_available">
+                                        API Available
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="cloud_native" name="cloud_native" checked>
+                                    <label class="form-check-label" for="cloud_native">
+                                        Cloud Native
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="maintenance_required" name="maintenance_required" checked>
+                                    <label class="form-check-label" for="maintenance_required">
+                                        Ongoing Maintenance Required
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Platform Support -->
+                        <div class="mb-3">
+                            <label for="supported_platforms" class="form-label">Supported Platforms</label>
+                            <input type="text" class="form-control" id="supported_platforms" name="supported_platforms" placeholder="web, mobile, api, desktop (comma-separated)">
+                            <div class="form-text">Enter platforms separated by commas</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="security_certifications" class="form-label">Security Certifications</label>
+                            <input type="text" class="form-control" id="security_certifications" name="security_certifications" placeholder="SOC2, ISO27001, PCI-DSS (comma-separated)">
+                            <div class="form-text">Enter certifications separated by commas</div>
+                        </div>
+
+                        <!-- AI Matching Keywords -->
+                        <h6 class="fw-bold mb-3 mt-4">AI Matching Configuration</h6>
+                        <div class="mb-3">
+                            <label for="technical_keywords" class="form-label">Technical Keywords</label>
+                            <input type="text" class="form-control" id="technical_keywords" name="technical_keywords" placeholder="authentication, oauth, sso, security (comma-separated)">
+                            <div class="form-text">Keywords that will help AI match this product to project requirements</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="industry_fit" class="form-label">Industry Fit</label>
+                            <input type="text" class="form-control" id="industry_fit" name="industry_fit" placeholder="healthcare, banking, retail, fintech (comma-separated)">
+                            <div class="form-text">Industries where this product is commonly used</div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('partner_products', partner_id=partner.id) }}" class="btn btn-outline-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Add Product
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Integration Complexity
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>Low:</strong> Simple configuration, minimal setup
+                        </div>
+                        <div class="mb-2">
+                            <strong>Medium:</strong> Moderate setup, some custom configuration
+                        </div>
+                        <div class="mb-2">
+                            <strong>High:</strong> Complex integration, significant development
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>AI Matching Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <p>Use specific technical keywords that clients might mention in RFPs:</p>
+                        <ul class="mb-0">
+                            <li>Technology names (OAuth, REST, GraphQL)</li>
+                            <li>Feature descriptions (real-time, scalable)</li>
+                            <li>Use cases (user management, reporting)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

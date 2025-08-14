@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 import json
 
+
 # Import models and utilities
 from models import *
 
@@ -280,7 +281,7 @@ def register_original_routes(app, db):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/projects/<int:project_id>/requirements', methods=['GET'])
+    @app.route('/api/projects/<project_id>/requirements', methods=['GET'])
     @login_required
     def api_get_requirements(project_id):
         """Get requirements for a project"""
@@ -305,7 +306,7 @@ def register_original_routes(app, db):
             'acceptance_criteria': req.acceptance_criteria
         } for req in requirements])
 
-    @app.route('/api/projects/<int:project_id>/extract-requirements', methods=['POST'])
+    @app.route('/api/projects/<project_id>/extract-requirements', methods=['POST'])
     @login_required
     def api_extract_requirements(project_id):
         """Extract requirements from project documents"""

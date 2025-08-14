@@ -325,6 +325,101 @@ class SystemLog(db.Model):
     extra_data = db.Column(db.JSON, default={})
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Partner(db.Model):
+    """Partner companies and their details"""
+    __tablename__ = 'partners'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    company_type = db.Column(db.String(50), default='TECHNOLOGY')  # STRATEGIC, VENDOR, TECHNOLOGY, INTEGRATION
+    status = db.Column(db.String(20), default='ACTIVE')  # ACTIVE, PREFERRED, INACTIVE
+    description = db.Column(db.Text)
+    website = db.Column(db.String(255))
+
+    # Contact information
+    primary_contact = db.Column(db.String(255))
+    contact_email = db.Column(db.String(255))
+    contact_phone = db.Column(db.String(50))
+
+    # Business terms
+    revenue_share_percentage = db.Column(db.Float)
+    discount_level = db.Column(db.Float)
+    support_level = db.Column(db.String(20), default='BASIC')  # BASIC, PREMIUM, ENTERPRISE
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    products = db.relationship('PartnerProduct', backref='partner', lazy=True, cascade='all, delete-orphan')
+
+class PartnerProduct(db.Model):
+    """Products offered by partners"""
+    __tablename__ = 'partner_products'
+
+    id = db.Column(db.Integer, primary_key=True)
+    partner_id = db.Column(db.Integer, db.ForeignKey('partners.id'), nullable=False)
+    product_name = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100), nullable=False)  # AUTHENTICATION, PAYMENT, ANALYTICS, etc.
+    functionality = db.Column(db.Text, nullable=False)  # Brief description
+
+    # Technical specifications
+    integration_complexity = db.Column(db.String(20), default='MEDIUM')  # LOW, MEDIUM, HIGH
+    api_available = db.Column(db.Boolean, default=True)
+    cloud_native = db.Column(db.Boolean, default=True)
+    supported_platforms = db.Column(db.JSON)  # ['web', 'mobile', 'api']
+    security_certifications = db.Column(db.JSON)  # ['SOC2', 'ISO27001', 'PCI-DSS']
+
+    # Business model
+    pricing_type = db.Column(db.String(50), default='SUBSCRIPTION')  # LICENSE, SUBSCRIPTION, TRANSACTION, USAGE
+    implementation_time = db.Column(db.String(50))  # "2-4 weeks"
+    maintenance_required = db.Column(db.Boolean, default=True)
+
+    # Matching keywords for AI analysis
+    technical_keywords = db.Column(db.JSON)  # ['authentication', 'oauth', 'sso']
+    industry_fit = db.Column(db.JSON)  # ['healthcare', 'banking', 'retail']
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PartnerRecommendation(db.Model):
+    """AI-generated partner recommendations for projects"""
+    __tablename__ = 'partner_recommendations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    recommendation_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    partner_id = db.Column(db.Integer, db.ForeignKey('partners.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('partner_products.id'), nullable=False)
+
+    # AI analysis results
+    fit_score = db.Column(db.Float, nullable=False)  # 0-100
+    matching_requirements = db.Column(db.JSON)  # Which requirement IDs this addresses
+    integration_scope = db.Column(db.String(20), default='ADDON')  # CORE, ADDON, OPTIONAL
+
+    # Estimations
+    estimated_cost = db.Column(db.Float)
+    estimated_timeline = db.Column(db.String(50))
+
+    # AI reasoning
+    ai_reasoning = db.Column(db.Text)  # AI explanation for recommendation
+    technical_considerations = db.Column(db.JSON)  # List of technical points
+    business_benefits = db.Column(db.JSON)  # List of business benefits
+
+    # User decision
+    status = db.Column(db.String(20), default='SUGGESTED')  # SUGGESTED, ACCEPTED, REJECTED, UNDER_REVIEW
+    user_notes = db.Column(db.Text)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    reviewed_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = db.relationship('Project', backref='partner_recommendations')
+    partner = db.relationship('Partner')
+    product = db.relationship('PartnerProduct')
+
 # ========================================
 # DATABASE INITIALIZATION FUNCTIONS
 # ========================================

@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Partner Recommendations - {{ project.name }} - Tender Analysis System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Partner Recommendations</h1>
+            <p class="text-muted">AI-generated partner solutions for {{ project.name }}</p>
+        </div>
+        <div>
+            <button id="generateRecommendations" class="btn btn-primary me-2">
+                <i class="fas fa-magic me-2"></i>Generate Recommendations
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Project
+            </a>
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div id="recommendationsList">
+        {% if recommendations %}
+        <div class="row">
+            {% for rec in recommendations %}
+            <div class="col-lg-6 mb-4">
+                <div class="card recommendation-card" data-id="{{ rec.recommendation_id }}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">{{ rec.partner.name }}</h6>
+                            <small class="text-muted">{{ rec.product.product_name }}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="fit-score">
+                                <span class="h4 mb-0 text-{{ 'success' if rec.fit_score >= 85 else 'warning' if rec.fit_score >= 70 else 'danger' }}">
+                                    {{ "%.0f"|format(rec.fit_score) }}%
+                                </span>
+                                <div class="small text-muted">Fit Score</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Integration Scope Badge -->
+                        <div class="mb-2">
+                            <span class="badge bg-{{ 'primary' if rec.integration_scope == 'CORE' else 'info' if rec.integration_scope == 'ADDON' else 'secondary' }}">
+                                {{ rec.integration_scope }} Integration
+                            </span>
+                            <span class="badge bg-light text-dark">{{ rec.product.category }}</span>
+                        </div>
+
+                        <!-- Functionality -->
+                        <p class="card-text">{{ rec.product.functionality[:150] }}{% if rec.product.functionality|length > 150 %}...{% endif %}</p>
+
+                        <!-- AI Reasoning -->
+                        {% if rec.ai_reasoning %}
+                        <div class="bg-light p-3 rounded mb-3">
+                            <h6 class="small fw-bold mb-1">
+                                <i class="fas fa-robot me-1"></i>AI Analysis
+                            </h6>
+                            <p class="small mb-0">{{ rec.ai_reasoning[:200] }}{% if rec.ai_reasoning|length > 200 %}...{% endif %}</p>
+                        </div>
+                        {% endif %}
+
+                        <!-- Technical Considerations -->
+                        {% if rec.technical_considerations %}
+                        <div class="mb-3">
+                            <h6 class="small fw-bold mb-2">Technical Considerations</h6>
+                            <ul class="small mb-0">
+                                {% for consideration in rec.technical_considerations[:2] %}
+                                <li>{{ consideration }}</li>
+                                {% endfor %}
+                                {% if rec.technical_considerations|length > 2 %}
+                                <li class="text-muted">+{{ rec.technical_considerations|length - 2 }} more...</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <!-- Cost & Timeline -->
+                        <div class="row text-center mb-3">
+                            <div class="col-6">
+                                <div class="small text-muted">Estimated Cost</div>
+                                <div class="fw-bold">${{ "{:,.0f}"|format(rec.estimated_cost) if rec.estimated_cost else 'TBD' }}</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="small text-muted">Timeline</div>
+                                <div class="fw-bold">{{ rec.estimated_timeline or 'TBD' }}</div>
+                            </div>
+                        </div>
+
+<!-- Status -->
+                       <div class="mb-3">
+                           <span class="badge bg-{{ 'success' if rec.status == 'ACCEPTED' else 'danger' if rec.status == 'REJECTED' else 'warning' if rec.status == 'UNDER_REVIEW' else 'secondary' }}">
+                               {{ rec.status.replace('_', ' ').title() }}
+                           </span>
+                           {% if rec.user_notes %}
+                           <small class="text-muted ms-2">{{ rec.user_notes[:50] }}{% if rec.user_notes|length > 50 %}...{% endif %}</small>
+                           {% endif %}
+                       </div>
+                   </div>
+                   <div class="card-footer bg-transparent">
+                       <div class="btn-group w-100" role="group">
+                           <button class="btn btn-outline-success btn-sm accept-btn" 
+                                   data-id="{{ rec.recommendation_id }}" 
+                                   {{ 'disabled' if rec.status == 'ACCEPTED' else '' }}>
+                               <i class="fas fa-check me-1"></i>Accept
+                           </button>
+                           <button class="btn btn-outline-danger btn-sm reject-btn" 
+                                   data-id="{{ rec.recommendation_id }}"
+                                   {{ 'disabled' if rec.status == 'REJECTED' else '' }}>
+                               <i class="fas fa-times me-1"></i>Reject
+                           </button>
+                           <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#detailModal{{ rec.id }}">
+                               <i class="fas fa-info me-1"></i>Details
+                           </button>
+                       </div>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Detail Modal -->
+           <div class="modal fade" id="detailModal{{ rec.id }}" tabindex="-1">
+               <div class="modal-dialog modal-lg">
+                   <div class="modal-content">
+                       <div class="modal-header">
+                           <h5 class="modal-title">{{ rec.partner.name }} - {{ rec.product.product_name }}</h5>
+                           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                       </div>
+                       <div class="modal-body">
+                           <div class="row">
+                               <div class="col-md-6">
+                                   <h6>Partner Information</h6>
+                                   <ul class="list-unstyled">
+                                       <li><strong>Company:</strong> {{ rec.partner.name }}</li>
+                                       <li><strong>Type:</strong> {{ rec.partner.company_type }}</li>
+                                       <li><strong>Status:</strong> {{ rec.partner.status }}</li>
+                                       {% if rec.partner.website %}
+                                       <li><strong>Website:</strong> <a href="{{ rec.partner.website }}" target="_blank">{{ rec.partner.website }}</a></li>
+                                       {% endif %}
+                                   </ul>
+                               </div>
+                               <div class="col-md-6">
+                                   <h6>Product Details</h6>
+                                   <ul class="list-unstyled">
+                                       <li><strong>Category:</strong> {{ rec.product.category }}</li>
+                                       <li><strong>Integration:</strong> {{ rec.product.integration_complexity }}</li>
+                                       <li><strong>API Available:</strong> {{ 'Yes' if rec.product.api_available else 'No' }}</li>
+                                       <li><strong>Cloud Native:</strong> {{ 'Yes' if rec.product.cloud_native else 'No' }}</li>
+                                   </ul>
+                               </div>
+                           </div>
+                           
+                           <div class="mt-3">
+                               <h6>AI Reasoning</h6>
+                               <p>{{ rec.ai_reasoning }}</p>
+                           </div>
+
+                           {% if rec.technical_considerations %}
+                           <div class="mt-3">
+                               <h6>Technical Considerations</h6>
+                               <ul>
+                                   {% for consideration in rec.technical_considerations %}
+                                   <li>{{ consideration }}</li>
+                                   {% endfor %}
+                               </ul>
+                           </div>
+                           {% endif %}
+
+                           {% if rec.business_benefits %}
+                           <div class="mt-3">
+                               <h6>Business Benefits</h6>
+                               <ul>
+                                   {% for benefit in rec.business_benefits %}
+                                   <li>{{ benefit }}</li>
+                                   {% endfor %}
+                               </ul>
+                           </div>
+                           {% endif %}
+                       </div>
+                       <div class="modal-footer">
+                           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                           <button type="button" class="btn btn-success accept-btn" data-id="{{ rec.recommendation_id }}">Accept Recommendation</button>
+                       </div>
+                   </div>
+               </div>
+           </div>
+           {% endfor %}
+       </div>
+       {% else %}
+       <!-- No Recommendations State -->
+       <div class="text-center py-5" id="noRecommendations">
+           <i class="fas fa-handshake fa-3x text-muted mb-3"></i>
+           <h4>No Partner Recommendations Yet</h4>
+           <p class="text-muted">Generate AI-powered partner recommendations based on your project requirements</p>
+           <button id="generateFirstRecommendations" class="btn btn-primary">
+               <i class="fas fa-magic me-2"></i>Generate Recommendations
+           </button>
+       </div>
+       {% endif %}
+   </div>
+
+   <!-- Loading State -->
+   <div id="loadingState" class="text-center py-5" style="display: none;">
+       <div class="spinner-border text-primary mb-3" role="status">
+           <span class="visually-hidden">Loading...</span>
+       </div>
+       <h5>Analyzing Requirements...</h5>
+       <p class="text-muted">AI is evaluating partner products against your project needs</p>
+   </div>
+</div>
+
+<!-- Notes Modal -->
+<div class="modal fade" id="notesModal" tabindex="-1">
+   <div class="modal-dialog">
+       <div class="modal-content">
+           <div class="modal-header">
+               <h5 class="modal-title">Add Notes</h5>
+               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+           </div>
+           <div class="modal-body">
+               <textarea id="notesTextarea" class="form-control" rows="4" placeholder="Add your notes about this recommendation..."></textarea>
+           </div>
+           <div class="modal-footer">
+               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+               <button type="button" id="saveNotes" class="btn btn-primary">Save & Continue</button>
+           </div>
+       </div>
+   </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+   let currentRecommendationId = null;
+   let currentAction = null;
+
+   // Generate recommendations
+   function generateRecommendations() {
+       const loadingState = document.getElementById('loadingState');
+       const recommendationsList = document.getElementById('recommendationsList');
+       const generateBtn = document.getElementById('generateRecommendations');
+       const generateFirstBtn = document.getElementById('generateFirstRecommendations');
+
+       // Show loading state
+       loadingState.style.display = 'block';
+       recommendationsList.style.display = 'none';
+       if (generateBtn) generateBtn.disabled = true;
+       if (generateFirstBtn) generateFirstBtn.disabled = true;
+
+       fetch(`/api/projects/{{ project.id }}/generate-partner-recommendations`, {
+           method: 'POST',
+           headers: {
+               'Content-Type': 'application/json',
+           }
+       })
+       .then(response => response.json())
+       .then(data => {
+           if (data.success) {
+               // Reload page to show new recommendations
+               location.reload();
+           } else {
+               alert('Error generating recommendations: ' + (data.error || 'Unknown error'));
+           }
+       })
+       .catch(error => {
+           console.error('Error:', error);
+           alert('Error generating recommendations');
+       })
+       .finally(() => {
+           loadingState.style.display = 'none';
+           recommendationsList.style.display = 'block';
+           if (generateBtn) generateBtn.disabled = false;
+           if (generateFirstBtn) generateFirstBtn.disabled = false;
+       });
+   }
+
+   // Attach event listeners
+   const generateBtn = document.getElementById('generateRecommendations');
+   const generateFirstBtn = document.getElementById('generateFirstRecommendations');
+   
+   if (generateBtn) {
+       generateBtn.addEventListener('click', generateRecommendations);
+   }
+   if (generateFirstBtn) {
+       generateFirstBtn.addEventListener('click', generateRecommendations);
+   }
+
+   // Accept/Reject handlers
+   document.querySelectorAll('.accept-btn').forEach(btn => {
+       btn.addEventListener('click', function() {
+           currentRecommendationId = this.dataset.id;
+           currentAction = 'ACCEPTED';
+           
+           // Show notes modal
+           const notesModal = new bootstrap.Modal(document.getElementById('notesModal'));
+           document.getElementById('notesTextarea').value = '';
+           notesModal.show();
+       });
+   });
+
+   document.querySelectorAll('.reject-btn').forEach(btn => {
+       btn.addEventListener('click', function() {
+           currentRecommendationId = this.dataset.id;
+           currentAction = 'REJECTED';
+           
+           // Show notes modal
+           const notesModal = new bootstrap.Modal(document.getElementById('notesModal'));
+           document.getElementById('notesTextarea').value = '';
+           notesModal.show();
+       });
+   });
+
+   // Save notes and update status
+   document.getElementById('saveNotes').addEventListener('click', function() {
+       const notes = document.getElementById('notesTextarea').value;
+       
+       fetch(`/api/recommendations/${currentRecommendationId}/update`, {
+           method: 'POST',
+           headers: {
+               'Content-Type': 'application/json',
+           },
+           body: JSON.stringify({
+               status: currentAction,
+               notes: notes
+           })
+       })
+       .then(response => response.json())
+       .then(data => {
+           if (data.success) {
+               // Reload page to reflect changes
+               location.reload();
+           } else {
+               alert('Error updating recommendation: ' + (data.error || 'Unknown error'));
+           }
+       })
+       .catch(error => {
+           console.error('Error:', error);
+           alert('Error updating recommendation');
+       });
+
+       // Hide modal
+       const notesModal = bootstrap.Modal.getInstance(document.getElementById('notesModal'));
+       notesModal.hide();
+   });
+});
+</script>
+{% endblock %}
