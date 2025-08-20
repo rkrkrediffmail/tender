@@ -78,7 +78,9 @@ flask-caching==2.1.0
 flower==2.0.1
 
 # Monitoring and health checks
-flask-healthz==0.0.3
+#flask-healthz==0.0.3
+
+flask-healthz
 flask-limiter==3.5.0
 
 # Input validation
