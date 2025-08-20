@@ -39,7 +39,7 @@ anthropic==0.57.1
 openai==1.98.0
 
 # LangChain and Vector Database - Conservative versions
-langchain==0.1.17
+langchain==0.2.5
 langchain-community==0.0.36
 langchain-openai==0.1.6
 langchain-postgres==0.0.8
