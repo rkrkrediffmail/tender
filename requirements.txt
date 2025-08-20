@@ -69,13 +69,8 @@ azure-identity==1.15.0
 azure-storage-blob==12.19.0
 azure-keyvault-secrets==4.7.0
 
-# Caching and background tasks
-redis==5.0.1
-celery==5.3.4
+# Caching (lightweight - no Redis needed)
 flask-caching==2.1.0
-
-# Celery monitoring (optional)
-flower==2.0.1
 
 # Monitoring and health checks
 #flask-healthz==0.0.3

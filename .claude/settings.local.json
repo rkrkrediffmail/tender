@@ -10,7 +10,8 @@
       "Bash(sudo chown:*)",
       "Bash(grep:*)",
       "WebFetch(domain:www.itssglobal.com)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

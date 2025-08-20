@@ -1,24 +1,12 @@
 services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
   web:
-    image: tender-system:latest
+    image: itss-rfpplus:latest
     build: .
     ports:
       - "5001:5000"
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - DATABASE_URL=postgresql://doadmin:12March1986$@bidpro.postgres.database.azure.com:5432/tender_system?sslmode=require
-      - REDIS_URL=redis://redis:6379/0
+      - FLASK_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -27,33 +15,15 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./.env:/app/.env
-      - .:/app
-    depends_on:
-      redis:
-        condition: service_healthy
     restart: unless-stopped
     command: python main.py
-
-  celery:
-    image: tender-system:latest
-    build: .
-    command: celery -A main.celery worker --loglevel=info --concurrency=2
-    environment:
-      - FLASK_ENV=development
-      - DATABASE_URL=postgresql://doadmin:12March1986$@bidpro.postgres.database.azure.com:5432/tender_system
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PYTHONPATH=/app
-    volumes:
-      - ./uploads:/app/uploads
-      - ./logs:/app/logs
-      - ./.env:/app/.env
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
-  postgres_data:
+  uploads_data:
+  logs_data:

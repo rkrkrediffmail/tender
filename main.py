@@ -132,7 +132,7 @@ def create_app():
             'web_running': True,
             'database_status': 'unknown',
             'database_initialized': False,
-            'celery_status': 'unknown',
+            'processing_mode': 'synchronous',
             'api_keys_configured': False,
             'projects_count': 0,
             'documents_count': 0,
@@ -154,18 +154,8 @@ def create_app():
         except Exception as e:
             status['database_status'] = f'error: {str(e)[:50]}'
 
-        # Check Celery/Redis
-        try:
-            import redis
-            redis_url = app.config.get('REDIS_URL') or os.getenv('REDIS_URL')
-            if redis_url:
-                r = redis.from_url(redis_url)
-                r.ping()
-                status['celery_status'] = 'redis_connected'
-            else:
-                status['celery_status'] = 'not_configured'
-        except Exception as e:
-            status['celery_status'] = f'error: {str(e)[:30]}'
+        # No background processing needed in simplified mode
+        status['processing_mode'] = 'synchronous - documents processed immediately'
 
         # Check API keys
         anthropic_key = os.environ.get('ANTHROPIC_API_KEY', '')
@@ -180,7 +170,7 @@ def create_app():
         status['ready_for_upload'] = (
             status['database_status'] == 'connected' and
             status['database_initialized'] and
-            status['celery_status'] in ['redis_connected', 'workers_active'] and
+            status['processing_mode'] == 'synchronous - documents processed immediately' and
             status['api_keys_configured']
         )
 
@@ -1371,38 +1361,44 @@ def create_app():
                     pass
                 return jsonify({'success': False, 'error': f'Database error: {str(e)}'}), 500
 
-            # Start background processing if available
-            task_id = None
+            # Process document synchronously (no background queue needed)
+            processing_result = None
             try:
-                if celery:
-                    from tasks import process_document_task
-                    task = process_document_task.delay(document.id)
-                    task_id = task.id
-
-                    if hasattr(document, 'task_id'):
-                        document.task_id = task_id
-                        db.session.commit()
-
-                    print(f"✅ Started background task: {task_id} for document {document.id}")
+                from sync_processor import process_document_sync
+                processing_result = process_document_sync(document)
+                
+                if processing_result['success']:
+                    print(f"✅ Document {document.id} processed successfully")
+                else:
+                    print(f"⚠️ Document processing had issues: {processing_result.get('message', 'Unknown error')}")
 
             except Exception as e:
-                print(f"⚠️ Background task failed to start: {e}")
+                print(f"❌ Document processing failed: {e}")
+                processing_result = {'success': False, 'error': str(e)}
                 if hasattr(document, 'processing_status'):
                     document.processing_status = 'failed'
                 if hasattr(document, 'error_message'):
                     document.error_message = f"Task start failed: {str(e)}"
                 db.session.commit()
 
+            # Include processing results in response
+            processing_message = "and processed successfully"
+            if processing_result:
+                if processing_result['success']:
+                    processing_message = f"and processed successfully ({processing_result.get('content_length', 0)} chars extracted)"
+                else:
+                    processing_message = f"but processing failed: {processing_result.get('error', 'Unknown error')}"
+            
             response_data = {
                 'success': True,
                 'document_id': document.id,
                 'filename': original_filename,
                 'file_size': saved_size,
-                'task_id': task_id,
+                'processing_result': processing_result,
                 'extracted_content_length': len(extracted_content) if extracted_content else 0,
                 'extraction_success': bool(extracted_content and extracted_content.strip()),
                 'extraction_error': extraction_error,
-                'message': f'File uploaded and {len(extracted_content)} characters extracted!' if extracted_content else f'File uploaded but content extraction failed: {extraction_error}'
+                'message': f'File uploaded {processing_message}'
             }
 
             print(f"✅ Upload successful: {response_data}")
@@ -1428,18 +1424,14 @@ def create_app():
             if not project:
                 return jsonify({'error': 'Access denied'}), 403
 
-            # Get task status if available
+            # In synchronous mode, documents are processed immediately
+            # Status is either 'completed', 'failed', or 'processing'
             task_status = None
-            if hasattr(document, 'task_id') and document.task_id and celery:
-                try:
-                    from celery.result import AsyncResult
-                    task = AsyncResult(document.task_id, app=celery)
-                    task_status = {
-                        'state': task.state,
-                        'info': task.info if task.state != 'PENDING' else None
-                    }
-                except Exception as e:
-                    print(f"⚠️ Could not get task status: {e}")
+            if hasattr(document, 'processing_status'):
+                task_status = {
+                    'state': document.processing_status.upper() if document.processing_status else 'COMPLETED',
+                    'info': 'Document processed synchronously'
+                }
 
             return jsonify({
                 'document_id': document.id,
@@ -3458,45 +3450,9 @@ def create_app():
 
     return app
 
-def create_celery():
-    """Create Celery instance for background tasks"""
-    try:
-        from celery import Celery
-
-        redis_url = os.getenv('REDIS_URL', 'redis://redis:6379/0')
-        print(f"🔗 Connecting to Redis: {redis_url}")
-
-        celery = Celery(
-            'tender_system',
-            broker=redis_url,
-            backend=redis_url
-        )
-
-        # Configure Celery
-        celery.conf.update(
-            task_serializer='json',
-            accept_content=['json'],
-            result_serializer='json',
-            timezone='UTC',
-            enable_utc=True,
-            result_expires=3600,
-            imports=['tasks'],
-            include=['tasks'],
-        )
-
-        print("✅ Celery configured successfully")
-        return celery
-
-    except ImportError:
-        print("⚠️ Celery not available - background tasks disabled")
-        return None
-    except Exception as e:
-        print(f"❌ Celery configuration error: {e}")
-        return None
-
-# Create application and celery instances
+# Create application instance (simplified - no background task queue)
 app = create_app()
-celery = create_celery()
+print("✅ ITSS RFPplus started without background task queue (simplified deployment)")
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
