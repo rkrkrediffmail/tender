@@ -9,7 +9,8 @@
       "Bash(sudo touch:*)",
       "Bash(sudo chown:*)",
       "Bash(grep:*)",
-      "WebFetch(domain:www.itssglobal.com)"
+      "WebFetch(domain:www.itssglobal.com)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

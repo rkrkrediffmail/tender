@@ -1,16 +1,10 @@
-# Core Flask framework (Latest)
-#Flask==3.0.0
-#Flask-SQLAlchemy==3.1.1
-#Flask-Login==0.6.3
-#Flask-WTF==1.2.1
-#Flask-Migrate==4.0.7
-#Flask-CORS==4.0.0
-Flask
-Flask-SQLAlchemy
-Flask-Login
-Flask-WTF
-Flask-Migrate
-Flask-CORS
+# Core Flask framework
+Flask>=3.0.0
+Flask-SQLAlchemy>=3.1.1
+Flask-Login>=0.6.3
+Flask-WTF>=1.2.1
+Flask-Migrate>=4.0.7
+Flask-CORS>=4.0.0
 
 WTForms==3.1.1
 Jinja2==3.1.2
