@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Responses - {{ project.name }}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .response-card {
+            border-left: 4px solid #1F4397;
+            transition: all 0.3s ease;
+        }
+        .response-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .response-card.failed {
+            border-left-color: #dc3545;
+        }
+        .response-card.processing {
+            border-left-color: #ffc107;
+        }
+        .response-card.favorite {
+            border-left-color: #28a745;
+        }
+        .provider-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+        .claude-badge { background: #1F4397; color: white; }
+        .openai-badge { background: #00d4aa; color: white; }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+        .status-processing { background: #fff3cd; color: #856404; }
+        .rating-stars {
+            color: #ffc107;
+        }
+        .response-content {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .filters {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Common Navigation -->
+    {% include 'common_navbar.html' %}
+
+    <div class="container mt-4">
+        <!-- Include Project Breadcrumb -->
+        {% set current_page = "AI Responses" %}
+        {% include 'project_breadcrumb.html' %}
+
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="display-6 mb-0">
+                            <i class="fas fa-robot me-3"></i>AI Responses
+                        </h1>
+                        <p class="text-muted">View and manage all AI interactions for {{ project.name }}</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary me-2" onclick="refreshResponses()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                        <button class="btn btn-primary" onclick="runNewAnalysis()">
+                            <i class="fas fa-plus me-1"></i>New Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Row -->
+        <div class="row mb-4" id="statsRow">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 id="totalResponses">-</h3>
+                        <p class="mb-0">Total Responses</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 id="averageRating">-</h3>
+                        <p class="mb-0">Average Rating</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 id="totalViews">-</h3>
+                        <p class="mb-0">Total Views</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 id="favoriteCount">-</h3>
+                        <p class="mb-0">Favorites</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Type:</label>
+                    <select class="form-select" id="typeFilter" onchange="applyFilters()">
+                        <option value="">All Types</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Provider:</label>
+                    <select class="form-select" id="providerFilter" onchange="applyFilters()">
+                        <option value="">All Providers</option>
+                        <option value="claude">Claude</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Status:</label>
+                    <select class="form-select" id="statusFilter" onchange="applyFilters()">
+                        <option value="">All Status</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="processing">Processing</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Show:</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showFavorites" onchange="applyFilters()">
+                        <label class="form-check-label" for="showFavorites">
+                            Favorites Only
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Responses List -->
+        <div id="responsesList">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Loading AI responses...</p>
+            </div>
+        </div>
+
+        <!-- Load More Button -->
+        <div class="text-center mt-4">
+            <button class="btn btn-outline-primary" id="loadMoreBtn" onclick="loadMoreResponses()" style="display: none;">
+                <i class="fas fa-arrow-down me-1"></i>Load More
+            </button>
+        </div>
+    </div>
+
+    <!-- Response Detail Modal -->
+    <div class="modal fade" id="responseModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">AI Response Detail</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Content loaded dynamically -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-warning" onclick="rerunResponse()" id="rerunBtn">
+                        <i class="fas fa-redo me-1"></i>Re-run
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="toggleFavorite()" id="favoriteBtn">
+                        <i class="fas fa-heart me-1"></i>Favorite
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating Modal -->
+    <div class="modal fade" id="ratingModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rate AI Response</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Rating (1-5 stars):</label>
+                        <div id="starRating" class="rating-stars">
+                            <i class="fas fa-star" data-rating="1"></i>
+                            <i class="fas fa-star" data-rating="2"></i>
+                            <i class="fas fa-star" data-rating="3"></i>
+                            <i class="fas fa-star" data-rating="4"></i>
+                            <i class="fas fa-star" data-rating="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Feedback (optional):</label>
+                        <textarea class="form-control" id="ratingFeedback" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitRating()">Submit Rating</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentResponses = [];
+        let currentOffset = 0;
+        let currentResponseId = null;
+        let selectedRating = 0;
+        const projectId = "{{ project.id }}";
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadResponses();
+            setupStarRating();
+        });
+
+        async function loadResponses() {
+            try {
+                const response = await fetch(`/api/ai/responses/${projectId}/history`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResponses(data.history);
+                    updateStats(data.stats);
+                } else {
+                    showError('Failed to load responses: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        function displayResponses(responses) {
+            const container = document.getElementById('responsesList');
+            
+            if (responses.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">No AI responses yet</h4>
+                        <p class="text-muted">AI responses will appear here after you run analysis</p>
+                        <button class="btn btn-primary" onclick="runNewAnalysis()">
+                            <i class="fas fa-plus me-1"></i>Run First Analysis
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            responses.forEach(family => {
+                if (family.parent) {
+                    html += generateResponseCard(family.parent, family.children);
+                }
+            });
+            
+            container.innerHTML = html;
+            currentResponses = responses;
+        }
+
+        function generateResponseCard(response, children) {
+            const statusClass = response.status === 'completed' ? 'status-completed' : 
+                              response.status === 'failed' ? 'status-failed' : 'status-processing';
+            
+            const providerClass = response.ai_provider === 'claude' ? 'claude-badge' : 'openai-badge';
+            
+            const cardClass = response.status === 'failed' ? 'failed' : 
+                            response.status === 'processing' ? 'processing' :
+                            response.is_favorite ? 'favorite' : '';
+
+            return `
+                <div class="card response-card ${cardClass}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="mb-1">
+                                    ${response.request_type.replace('_', ' ').toUpperCase()}
+                                    ${response.is_favorite ? '<i class="fas fa-heart text-danger ms-1"></i>' : ''}
+                                </h6>
+                                <div class="mb-2">
+                                    <span class="provider-badge ${providerClass}">${response.ai_provider.toUpperCase()}</span>
+                                    <span class="status-badge ${statusClass} ms-2">${response.status.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">${new Date(response.created_at).toLocaleDateString()}</small>
+                                ${response.human_rating ? `
+                                    <div class="rating-stars">
+                                        ${'<i class="fas fa-star"></i>'.repeat(response.human_rating)}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <small class="text-muted">
+                                    <i class="fas fa-eye me-1"></i>Viewed ${response.view_count} times
+                                    ${response.rerun_count > 0 ? `<span class="ms-2"><i class="fas fa-redo me-1"></i>${response.rerun_count} reruns</span>` : ''}
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-sm btn-outline-primary me-1" onclick="viewResponse('${response.response_id}')">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning me-1" onclick="showRatingModal('${response.response_id}')">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="rerunFromCard('${response.response_id}')">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        ${children && children.length > 0 ? `
+                            <div class="border-top pt-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-branch-code me-1"></i>
+                                    ${children.length} rerun${children.length > 1 ? 's' : ''}
+                                </small>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalResponses').textContent = stats.total_responses;
+            document.getElementById('averageRating').textContent = stats.average_rating ? 
+                stats.average_rating.toFixed(1) + ' ★' : 'N/A';
+            document.getElementById('totalViews').textContent = stats.total_views;
+            document.getElementById('favoriteCount').textContent = stats.favorites;
+
+            // Update filter options
+            updateFilterOptions(stats);
+        }
+
+        function updateFilterOptions(stats) {
+            const typeFilter = document.getElementById('typeFilter');
+            typeFilter.innerHTML = '<option value="">All Types</option>';
+            Object.keys(stats.by_type).forEach(type => {
+                typeFilter.innerHTML += `<option value="${type}">${type.replace('_', ' ').toUpperCase()} (${stats.by_type[type]})</option>`;
+            });
+        }
+
+        async function viewResponse(responseId) {
+            try {
+                const response = await fetch(`/api/ai/response/${responseId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResponseModal(data);
+                } else {
+                    showError('Failed to load response details');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        function displayResponseModal(data) {
+            const response = data.response;
+            currentResponseId = response.response_id;
+
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Request Information</h6>
+                        <p><strong>Type:</strong> ${response.request_type}</p>
+                        <p><strong>Provider:</strong> ${response.ai_provider} (${response.ai_model})</p>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Created:</strong> ${new Date(response.created_at).toLocaleString()}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Statistics</h6>
+                        <p><strong>Views:</strong> ${response.view_count}</p>
+                        <p><strong>Rating:</strong> ${response.human_rating ? response.human_rating + ' stars' : 'Not rated'}</p>
+                        <p><strong>Reruns:</strong> ${response.rerun_count}</p>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>AI Response</h6>
+                    <div class="response-content">
+                        ${response.full_response || 'No response content available'}
+                    </div>
+                </div>
+                
+                ${response.parsed_response ? `
+                    <div class="mt-4">
+                        <h6>Parsed Results</h6>
+                        <pre class="response-content">${JSON.stringify(response.parsed_response, null, 2)}</pre>
+                    </div>
+                ` : ''}
+            `;
+
+            // Update modal buttons
+            const favoriteBtn = document.getElementById('favoriteBtn');
+            favoriteBtn.innerHTML = response.is_favorite ? 
+                '<i class="fas fa-heart-broken me-1"></i>Unfavorite' : 
+                '<i class="fas fa-heart me-1"></i>Favorite';
+
+            new bootstrap.Modal(document.getElementById('responseModal')).show();
+        }
+
+        function refreshResponses() {
+            loadResponses();
+        }
+
+        function runNewAnalysis() {
+            window.location.href = `/post_analysis/${projectId}`;
+        }
+
+        function showError(message) {
+            console.error(message);
+            // You can integrate with a toast library or use alerts
+            alert('Error: ' + message);
+        }
+
+        function applyFilters() {
+            // Implementation for filtering responses
+            console.log('Filtering responses...');
+        }
+
+        function setupStarRating() {
+            const stars = document.querySelectorAll('#starRating i');
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    selectedRating = parseInt(this.dataset.rating);
+                    updateStarDisplay();
+                });
+            });
+        }
+
+        function updateStarDisplay() {
+            const stars = document.querySelectorAll('#starRating i');
+            stars.forEach((star, index) => {
+                if (index < selectedRating) {
+                    star.style.color = '#ffc107';
+                } else {
+                    star.style.color = '#e4e5e9';
+                }
+            });
+        }
+
+        function showRatingModal(responseId) {
+            currentResponseId = responseId;
+            selectedRating = 0;
+            updateStarDisplay();
+            document.getElementById('ratingFeedback').value = '';
+            new bootstrap.Modal(document.getElementById('ratingModal')).show();
+        }
+
+        async function submitRating() {
+            if (selectedRating === 0) {
+                alert('Please select a rating');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/ai/response/${currentResponseId}/rate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rating: selectedRating,
+                        feedback: document.getElementById('ratingFeedback').value
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('ratingModal')).hide();
+                    loadResponses(); // Refresh to show updated rating
+                } else {
+                    showError('Failed to submit rating');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        async function toggleFavorite() {
+            try {
+                const response = await fetch(`/api/ai/response/${currentResponseId}/favorite`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    loadResponses(); // Refresh to show updated favorite status
+                    bootstrap.Modal.getInstance(document.getElementById('responseModal')).hide();
+                } else {
+                    showError('Failed to toggle favorite');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        async function rerunResponse() {
+            try {
+                const reason = prompt('Reason for rerun (optional):') || 'Manual rerun';
+                
+                const response = await fetch(`/api/ai/response/${currentResponseId}/rerun`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason: reason })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('Rerun initiated! Check back in a few minutes.');
+                    loadResponses(); // Refresh to show the new rerun entry
+                } else {
+                    showError('Failed to initiate rerun');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        async function rerunFromCard(responseId) {
+            currentResponseId = responseId;
+            rerunResponse();
+        }
+    </script>
+</body>
+</html>

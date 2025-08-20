@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Provider Settings - ITSS RFPplus</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .provider-card {
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        .provider-card:hover {
+            border-color: #1F4397;
+        }
+        .provider-card.active {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-available { background: #d4edda; color: #155724; }
+        .status-unavailable { background: #f8d7da; color: #721c24; }
+        .btn-primary {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Common Navigation -->
+    {% include 'common_navbar.html' %}
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-6 mb-0">
+                    <i class="fas fa-robot me-3"></i>AI Provider Settings
+                </h1>
+                <p class="text-muted">Configure and manage AI providers for document analysis</p>
+            </div>
+        </div>
+
+        <!-- Current Status -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Current Configuration
+                </h5>
+            </div>
+            <div class="card-body" id="currentStatus">
+                <div class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading AI provider status...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Provider Cards -->
+        <div class="row">
+            <!-- Claude Provider -->
+            <div class="col-md-6">
+                <div class="card provider-card" id="claudeCard">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="fas fa-brain fa-2x text-primary"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0">Anthropic Claude</h5>
+                                <small class="text-muted">Advanced reasoning and analysis</small>
+                            </div>
+                            <div class="ms-auto">
+                                <span class="status-badge" id="claudeStatus">Checking...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <strong>Features:</strong>
+                            <ul class="mt-2">
+                                <li>Superior document analysis</li>
+                                <li>Complex reasoning capabilities</li>
+                                <li>Large context window</li>
+                                <li>Excellent for legal/technical content</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <strong>Current Model:</strong>
+                            <div class="mt-2">
+                                <span class="badge bg-primary" id="claudeCurrentModel">Loading...</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="claudeModelSelect" class="form-label"><strong>Select Model:</strong></label>
+                            <select class="form-select" id="claudeModelSelect" onchange="changeModel('claude')">
+                                <option value="">Loading models...</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="switchProvider('claude')" id="claudeSwitch">
+                                <i class="fas fa-check me-1"></i>Use Claude
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="testProvider('claude')" id="claudeTest">
+                                <i class="fas fa-vial me-1"></i>Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OpenAI Provider -->
+            <div class="col-md-6">
+                <div class="card provider-card" id="openaiCard">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="fas fa-microchip fa-2x text-success"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-0">OpenAI GPT</h5>
+                                <small class="text-muted">Versatile and fast processing</small>
+                            </div>
+                            <div class="ms-auto">
+                                <span class="status-badge" id="openaiStatus">Checking...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <strong>Features:</strong>
+                            <ul class="mt-2">
+                                <li>Fast response times</li>
+                                <li>Cost-effective processing</li>
+                                <li>Wide language support</li>
+                                <li>Good for general analysis</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <strong>Current Model:</strong>
+                            <div class="mt-2">
+                                <span class="badge bg-success" id="openaiCurrentModel">Loading...</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="openaiModelSelect" class="form-label"><strong>Select Model:</strong></label>
+                            <select class="form-select" id="openaiModelSelect" onchange="changeModel('openai')">
+                                <option value="">Loading models...</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="switchProvider('openai')" id="openaiSwitch">
+                                <i class="fas fa-check me-1"></i>Use OpenAI
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="testProvider('openai')" id="openaiTest">
+                                <i class="fas fa-vial me-1"></i>Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Instructions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>Setup Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Claude (Anthropic)</h6>
+                        <ol>
+                            <li>Visit <a href="https://console.anthropic.com" target="_blank">Anthropic Console</a></li>
+                            <li>Create an account and get API key</li>
+                            <li>Set environment variable: <code>ANTHROPIC_API_KEY=your_key</code></li>
+                            <li>Restart the application</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>OpenAI GPT</h6>
+                        <ol>
+                            <li>Visit <a href="https://platform.openai.com" target="_blank">OpenAI Platform</a></li>
+                            <li>Create an account and get API key</li>
+                            <li>Set environment variable: <code>OPENAI_API_KEY=your_key</code></li>
+                            <li>Restart the application</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Tip:</strong> You can configure both providers and the system will automatically fallback if the primary provider fails.
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Model Availability:</strong> GPT-5 and GPT-4.1 models may not be available yet. The system will show an error if you select an unavailable model. Current production models are Claude Sonnet 4 and GPT-4 Turbo.
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="card" id="testResults" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-test-tube me-2"></i>Test Results
+                </h5>
+            </div>
+            <div class="card-body" id="testContent">
+                <!-- Test results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProviderStatus();
+        });
+
+        async function loadProviderStatus() {
+            try {
+                const response = await fetch('/api/ai/providers');
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatusDisplay(data);
+                } else {
+                    showError('Failed to load provider status: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        function updateStatusDisplay(data) {
+            const providers = data.providers.providers;
+            const config = data.config;
+            const apiKeys = data.api_keys;
+            const availableModels = data.available_models;
+            const currentModels = config.current_models;
+
+            // Update current status
+            document.getElementById('currentStatus').innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Active Provider:</strong>
+                        <div class="text-primary">${config.preferred_provider.toUpperCase()}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Active Model:</strong>
+                        <div class="text-info">${getModelDisplayName(config.preferred_provider, currentModels[config.preferred_provider], availableModels)}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Fallback:</strong>
+                        <div class="text-success">${config.fallback_enabled ? 'Enabled' : 'Disabled'}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Available:</strong>
+                        <div class="text-info">${data.providers.available_count} provider(s)</div>
+                    </div>
+                </div>
+            `;
+
+            // Update Claude status and models
+            const claudeAvailable = providers.claude.available && apiKeys.claude;
+            document.getElementById('claudeStatus').innerHTML = claudeAvailable ? 'Available' : 'Unavailable';
+            document.getElementById('claudeStatus').className = `status-badge ${claudeAvailable ? 'status-available' : 'status-unavailable'}`;
+            document.getElementById('claudeCard').className = `card provider-card ${config.preferred_provider === 'claude' ? 'active' : ''}`;
+            
+            // Update Claude model dropdown
+            updateModelDropdown('claude', availableModels.claude, currentModels.claude, claudeAvailable);
+
+            // Update OpenAI status and models
+            const openaiAvailable = providers.openai.available && apiKeys.openai;
+            document.getElementById('openaiStatus').innerHTML = openaiAvailable ? 'Available' : 'Unavailable';
+            document.getElementById('openaiStatus').className = `status-badge ${openaiAvailable ? 'status-available' : 'status-unavailable'}`;
+            document.getElementById('openaiCard').className = `card provider-card ${config.preferred_provider === 'openai' ? 'active' : ''}`;
+            
+            // Update OpenAI model dropdown
+            updateModelDropdown('openai', availableModels.openai, currentModels.openai, openaiAvailable);
+
+            // Update buttons
+            updateButtons(config.preferred_provider, claudeAvailable, openaiAvailable);
+        }
+
+        function updateModelDropdown(provider, models, currentModel, available) {
+            const select = document.getElementById(provider + 'ModelSelect');
+            const currentModelBadge = document.getElementById(provider + 'CurrentModel');
+            
+            // Update current model display
+            const modelInfo = models[currentModel];
+            currentModelBadge.innerHTML = modelInfo ? modelInfo.name : currentModel;
+            
+            // Clear and populate dropdown
+            select.innerHTML = '';
+            
+            if (!available) {
+                select.innerHTML = '<option value="">Provider not available</option>';
+                select.disabled = true;
+                return;
+            }
+            
+            // Group models by tier
+            const tiers = { premium: [], standard: [], fast: [] };
+            
+            Object.entries(models).forEach(([modelId, modelInfo]) => {
+                const tier = modelInfo.tier || 'standard';
+                tiers[tier].push({ id: modelId, info: modelInfo });
+            });
+            
+            // Add options grouped by tier
+            ['premium', 'standard', 'fast'].forEach(tier => {
+                if (tiers[tier].length > 0) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = tier.charAt(0).toUpperCase() + tier.slice(1) + ' Models';
+                    
+                    tiers[tier].forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.innerHTML = `${model.info.name} - ${model.info.description}`;
+                        option.selected = model.id === currentModel;
+                        optgroup.appendChild(option);
+                    });
+                    
+                    select.appendChild(optgroup);
+                }
+            });
+            
+            select.disabled = false;
+        }
+
+        function getModelDisplayName(provider, modelId, availableModels) {
+            const models = availableModels[provider];
+            const modelInfo = models && models[modelId];
+            return modelInfo ? modelInfo.name : modelId;
+        }
+
+        function updateButtons(preferred, claudeAvailable, openaiAvailable) {
+            // Claude buttons
+            const claudeSwitch = document.getElementById('claudeSwitch');
+            const claudeTest = document.getElementById('claudeTest');
+            
+            if (preferred === 'claude') {
+                claudeSwitch.innerHTML = '<i class="fas fa-check-circle me-1"></i>Currently Active';
+                claudeSwitch.disabled = true;
+            } else {
+                claudeSwitch.innerHTML = '<i class="fas fa-check me-1"></i>Use Claude';
+                claudeSwitch.disabled = !claudeAvailable;
+            }
+            claudeTest.disabled = !claudeAvailable;
+
+            // OpenAI buttons
+            const openaiSwitch = document.getElementById('openaiSwitch');
+            const openaiTest = document.getElementById('openaiTest');
+            
+            if (preferred === 'openai') {
+                openaiSwitch.innerHTML = '<i class="fas fa-check-circle me-1"></i>Currently Active';
+                openaiSwitch.disabled = true;
+            } else {
+                openaiSwitch.innerHTML = '<i class="fas fa-check me-1"></i>Use OpenAI';
+                openaiSwitch.disabled = !openaiAvailable;
+            }
+            openaiTest.disabled = !openaiAvailable;
+        }
+
+        async function switchProvider(provider) {
+            try {
+                const response = await fetch('/api/ai/providers/switch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ provider: provider })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(`Successfully switched to ${provider.toUpperCase()}`);
+                    loadProviderStatus(); // Reload status
+                } else {
+                    showError('Failed to switch provider: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            }
+        }
+
+        async function changeModel(provider) {
+            const select = document.getElementById(provider + 'ModelSelect');
+            const selectedModel = select.value;
+            
+            if (!selectedModel) return;
+            
+            try {
+                const response = await fetch('/api/ai/models/switch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        provider: provider, 
+                        model: selectedModel 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(`Successfully switched ${provider.toUpperCase()} model`);
+                    loadProviderStatus(); // Reload status
+                } else {
+                    showError('Failed to switch model: ' + data.error);
+                    loadProviderStatus(); // Reload to reset dropdown
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+                loadProviderStatus(); // Reload to reset dropdown
+            }
+        }
+
+        async function testProvider(provider) {
+            const testButton = document.getElementById(provider + 'Test');
+            const originalText = testButton.innerHTML;
+            
+            testButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+            testButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/ai/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ provider: provider })
+                });
+
+                const data = await response.json();
+
+                showTestResult(provider, data);
+            } catch (error) {
+                showTestResult(provider, { success: false, error: error.message });
+            } finally {
+                testButton.innerHTML = originalText;
+                testButton.disabled = false;
+            }
+        }
+
+        function showTestResult(provider, result) {
+            const testResults = document.getElementById('testResults');
+            const testContent = document.getElementById('testContent');
+
+            testContent.innerHTML = `
+                <div class="alert ${result.success ? 'alert-success' : 'alert-danger'}">
+                    <h6>${provider.toUpperCase()} Test Result</h6>
+                    ${result.success ? 
+                        `<p class="mb-1"><strong>✅ Success!</strong></p>
+                         <p class="mb-1"><strong>Response:</strong> ${result.response}</p>
+                         <small class="text-muted">Provider: ${result.provider_used}</small>` :
+                        `<p class="mb-0"><strong>❌ Failed:</strong> ${result.error}</p>`
+                    }
+                </div>
+            `;
+
+            testResults.style.display = 'block';
+            testResults.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showSuccess(message) {
+            // You can integrate with a toast library or use a simple alert
+            alert('✅ ' + message);
+        }
+
+        function showError(message) {
+            console.error(message);
+            alert('❌ ' + message);
+        }
+    </script>
+</body>
+</html>

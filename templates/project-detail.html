@@ -1,0 +1,114 @@
+        <!DOCTYPE html>
+        <html>
+        <head>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/itss-theme.css" rel="stylesheet">
+            <title>{{ project.name }} - Project Details</title>
+            <style>
+                body { font-family: 'Poppins', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                .btn { padding: 10px 20px; background: #1F4397; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
+                .btn:hover { background: #10224c; }
+                .btn-success { background: #28a745; }
+                .card { background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 8px; border: 1px solid #e9ecef; }
+                .document-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 15px;
+                    background: white;
+                    margin: 10px 0;
+                    border-radius: 5px;
+                    border: 1px solid #ddd;
+                }
+                .status-badge {
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+                .status-completed { background: #d4edda; color: #155724; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>📁 {{ project.name }}</h1>
+                        <p style="color: #6c757d;">{{ project.description or 'No description provided' }}</p>
+                    </div>
+                    <div>
+                        <a href="/projects" class="btn">← Back to Projects</a>
+                        <a href="/project/{{ project.id }}/workflow" class="btn" style="background: #6f42c1;">🔄 Workflow</a>
+                        <a href="/project/{{ project.id }}/analysis-history" class="btn" style="background: #17a2b8;">📊 Analysis History</a>
+                        <a href="/upload?project_id={{ project.id }}" class="btn btn-success">📄 Upload Documents</a>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📊 Project Information</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <p><strong>Status:</strong> {{ project.status.title() }}</p>
+                            <p><strong>RFP Type:</strong> {{ project.rfp_type.title() if project.rfp_type else 'Not specified' }}</p>
+                            <p><strong>Priority:</strong> {{ project.priority.title() if project.priority else 'Medium' }}</p>
+                        </div>
+                        <div>
+                            <p><strong>Workflow Stage:</strong> 
+                                <span class="status-badge" style="background: {{ '#28a745' if project.workflow_stage == 'approved' else '#ffc107' if project.workflow_stage == 'created' else '#17a2b8' }}; color: white;">
+                                    {{ project.workflow_stage.title() if project.workflow_stage else 'Created' }}
+                                </span>
+                            </p>
+                            <p><strong>Created:</strong> {{ project.created_at.strftime('%B %d, %Y') if project.created_at else 'Unknown' }}</p>
+                            <p><strong>Total Documents:</strong> {{ documents|length }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📄 Documents</h3>
+                    {% if documents %}
+                        {% for doc in documents %}
+                        <div class="document-item">
+                            <div>
+                                <strong>{{ doc.original_filename or doc.filename }}</strong>
+                                <p style="margin: 5px 0; color: #6c757d;">
+                                    Uploaded: {{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') if doc.uploaded_at else 'Unknown' }}
+                                    | Size: {{ "%.1f"|format(doc.file_size/1024/1024) if doc.file_size else '0' }} MB
+                                </p>
+                            </div>
+                            <div>
+                                <span class="status-badge status-completed">✅ Ready</span>
+                                <a href="/document/{{ doc.id }}" class="btn" style="margin-left: 10px;">View Analysis</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align: center; padding: 40px; color: #6c757d;">
+                            <h4>📄 No Documents Yet</h4>
+                            <p>Upload RFP documents to start AI analysis</p>
+                            <a href="/upload?project_id={{ project.id }}" class="btn btn-success">Upload First Document</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if documents %}
+                <div class="card">
+                    <h3>🤖 AI Analysis</h3>
+                    <p>AI-powered analysis of {{ documents|length }} document(s) in this project</p>
+                    
+                    <div style="display: flex; gap: 10px; margin: 20px 0;">
+                        <a href="/project/{{ project.id }}/analysis-history" class="btn" style="background: #6f42c1;">📈 View Analysis History</a>
+                        <a href="/post_analysis/{{ project.id }}" class="btn" style="background: #fd7e14;">🔄 Run New Analysis</a>
+                        <a href="/analysis/{{ project.id }}" class="btn btn-success">📊 Latest Results</a>
+                    </div>
+
+                    <div id="analysisPreview" style="background: #e9ecef; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                        <em>Click "View Analysis History" to see all past AI analyses and their results.</em>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </body>
+        </html>

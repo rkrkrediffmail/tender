@@ -1,0 +1,37 @@
+<!-- Project Breadcrumb Navigation -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb bg-light p-3 rounded">
+        <li class="breadcrumb-item">
+            <a href="/"><i class="fas fa-home me-1"></i>Dashboard</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="/projects"><i class="fas fa-folder me-1"></i>Projects</a>
+        </li>
+        {% if project %}
+        <li class="breadcrumb-item">
+            <a href="/project/{{ project.id }}">{{ project.name }}</a>
+        </li>
+        {% endif %}
+        {% if current_page %}
+        <li class="breadcrumb-item active" aria-current="page">{{ current_page }}</li>
+        {% endif %}
+    </ol>
+</nav>
+
+<style>
+    .breadcrumb {
+        border-radius: 8px;
+        background: #f8f9fa !important;
+    }
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: ">";
+        color: #1F4397;
+    }
+    .breadcrumb a {
+        color: #1F4397;
+        text-decoration: none;
+    }
+    .breadcrumb a:hover {
+        color: #10224c;
+    }
+</style>

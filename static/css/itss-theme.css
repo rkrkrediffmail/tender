@@ -1,0 +1,304 @@
+/* ITSS Global Branding Theme */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+
+:root {
+    /* ITSS Color Palette */
+    --itss-primary: #1F4397;
+    --itss-secondary: #10224c;
+    --itss-accent: #FCAF17;
+    --itss-light: #7291CB;
+    --itss-success: #28a745;
+    --itss-warning: #FCAF17;
+    --itss-danger: #dc3545;
+    --itss-info: #17a2b8;
+    
+    /* Fonts */
+    --itss-font-primary: 'Poppins', sans-serif;
+    --itss-font-headings: 'Montserrat', sans-serif;
+    
+    /* Spacing and Borders */
+    --itss-border-radius: 8px;
+    --itss-border-radius-lg: 15px;
+    --itss-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    --itss-shadow-hover: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+/* Global Styles */
+body {
+    font-family: var(--itss-font-primary);
+    background: #f8f9fa;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--itss-font-headings);
+    color: var(--itss-secondary);
+}
+
+/* ITSS Navbar Styles */
+.navbar-itss {
+    background: linear-gradient(135deg, var(--itss-primary) 0%, var(--itss-secondary) 100%);
+    box-shadow: var(--itss-shadow);
+    font-family: var(--itss-font-primary);
+}
+
+.navbar-itss .navbar-brand {
+    font-family: var(--itss-font-headings);
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.navbar-itss .nav-link {
+    font-family: var(--itss-font-primary);
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.navbar-itss .nav-link:hover {
+    background: rgba(252, 175, 23, 0.1);
+    border-radius: var(--itss-border-radius);
+    color: var(--itss-accent) !important;
+}
+
+.navbar-itss .dropdown-menu {
+    border: none;
+    box-shadow: var(--itss-shadow);
+    border-radius: var(--itss-border-radius);
+}
+
+.navbar-itss .dropdown-item:hover {
+    background-color: var(--itss-accent);
+    color: white;
+}
+
+/* ITSS Button Styles */
+.btn-itss-primary {
+    background: linear-gradient(135deg, var(--itss-primary) 0%, var(--itss-secondary) 100%);
+    border: none;
+    color: white;
+    font-family: var(--itss-font-primary);
+    font-weight: 500;
+    border-radius: var(--itss-border-radius);
+    transition: all 0.3s ease;
+    padding: 0.5rem 1.5rem;
+}
+
+.btn-itss-primary:hover {
+    background: linear-gradient(135deg, var(--itss-secondary) 0%, var(--itss-primary) 100%);
+    transform: translateY(-2px);
+    box-shadow: var(--itss-shadow-hover);
+    color: white;
+}
+
+.btn-itss-secondary {
+    background: var(--itss-accent);
+    border: none;
+    color: white;
+    font-family: var(--itss-font-primary);
+    font-weight: 500;
+    border-radius: var(--itss-border-radius);
+    transition: all 0.3s ease;
+    padding: 0.5rem 1.5rem;
+}
+
+.btn-itss-secondary:hover {
+    background: #e09500;
+    transform: translateY(-2px);
+    box-shadow: var(--itss-shadow-hover);
+    color: white;
+}
+
+.btn-outline-itss {
+    border: 2px solid var(--itss-primary);
+    color: var(--itss-primary);
+    background: transparent;
+    font-family: var(--itss-font-primary);
+    font-weight: 500;
+    border-radius: var(--itss-border-radius);
+    transition: all 0.3s ease;
+    padding: 0.5rem 1.5rem;
+}
+
+.btn-outline-itss:hover {
+    background: var(--itss-primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* ITSS Card Styles */
+.card-itss {
+    border: none;
+    border-radius: var(--itss-border-radius-lg);
+    box-shadow: var(--itss-shadow);
+    transition: all 0.3s ease;
+}
+
+.card-itss:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--itss-shadow-hover);
+}
+
+.card-itss-primary {
+    background: linear-gradient(135deg, var(--itss-primary) 0%, var(--itss-secondary) 100%);
+    color: white;
+}
+
+.card-itss-accent {
+    background: var(--itss-accent);
+    color: white;
+}
+
+/* Status Indicators */
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-good { background-color: var(--itss-success); }
+.status-warning { background-color: var(--itss-warning); }
+.status-error { background-color: var(--itss-danger); }
+
+/* Text Color Utilities */
+.text-itss-primary { color: var(--itss-primary) !important; }
+.text-itss-secondary { color: var(--itss-secondary) !important; }
+.text-itss-accent { color: var(--itss-accent) !important; }
+.text-itss-light { color: var(--itss-light) !important; }
+
+/* Background Color Utilities */
+.bg-itss-primary { background-color: var(--itss-primary) !important; }
+.bg-itss-secondary { background-color: var(--itss-secondary) !important; }
+.bg-itss-accent { background-color: var(--itss-accent) !important; }
+.bg-itss-light { background-color: var(--itss-light) !important; }
+
+/* Form Styles */
+.form-control:focus {
+    border-color: var(--itss-primary);
+    box-shadow: 0 0 0 0.2rem rgba(31, 67, 151, 0.25);
+}
+
+.form-select:focus {
+    border-color: var(--itss-primary);
+    box-shadow: 0 0 0 0.2rem rgba(31, 67, 151, 0.25);
+}
+
+/* Table Styles */
+.table-itss thead th {
+    background-color: var(--itss-primary);
+    color: white;
+    border: none;
+    font-family: var(--itss-font-headings);
+    font-weight: 600;
+}
+
+.table-itss tbody tr:hover {
+    background-color: rgba(31, 67, 151, 0.05);
+}
+
+/* Alert Styles */
+.alert-itss-primary {
+    background-color: rgba(31, 67, 151, 0.1);
+    border-color: var(--itss-primary);
+    color: var(--itss-primary);
+}
+
+.alert-itss-accent {
+    background-color: rgba(252, 175, 23, 0.1);
+    border-color: var(--itss-accent);
+    color: #b8840a;
+}
+
+/* Badge Styles */
+.badge-itss-primary {
+    background-color: var(--itss-primary);
+    color: white;
+}
+
+.badge-itss-accent {
+    background-color: var(--itss-accent);
+    color: white;
+}
+
+/* Progress Bar Styles */
+.progress-itss .progress-bar {
+    background: linear-gradient(135deg, var(--itss-primary) 0%, var(--itss-secondary) 100%);
+}
+
+/* Pagination Styles */
+.pagination-itss .page-link {
+    color: var(--itss-primary);
+    border-color: var(--itss-primary);
+}
+
+.pagination-itss .page-link:hover {
+    background-color: var(--itss-primary);
+    border-color: var(--itss-primary);
+    color: white;
+}
+
+.pagination-itss .page-item.active .page-link {
+    background-color: var(--itss-primary);
+    border-color: var(--itss-primary);
+}
+
+/* Custom ITSS Components */
+.itss-hero {
+    background: linear-gradient(135deg, var(--itss-primary) 0%, var(--itss-secondary) 100%);
+    color: white;
+    padding: 4rem 0;
+}
+
+.itss-section {
+    padding: 3rem 0;
+}
+
+.itss-icon {
+    color: var(--itss-accent);
+    font-size: 2rem;
+}
+
+.itss-divider {
+    border-top: 3px solid var(--itss-accent);
+    width: 50px;
+    margin: 1rem 0;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .navbar-itss .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .navbar-itss .navbar-brand img {
+        height: 35px !important;
+    }
+}
+
+/* Animation Utilities */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in-left {
+    animation: slideInLeft 0.5s ease-out;
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.slide-in-right {
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(50px); }
+    to { opacity: 1; transform: translateX(0); }
+}

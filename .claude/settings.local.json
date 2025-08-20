@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(docker:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(sudo touch:*)",
+      "Bash(sudo chown:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:www.itssglobal.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

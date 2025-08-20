@@ -1,0 +1,114 @@
+<!-- Common Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="/">
+            <img src="/static/img/itss-logo-white.png" alt="ITSS Global" height="40" class="me-3">
+            <span class="fw-bold">ITSS RFPplus</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                </a>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-folder me-1"></i>Projects
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/projects">
+                            <i class="fas fa-folder-open me-1"></i>Active Projects
+                        </a></li>
+                        <li><a class="dropdown-item" href="/projects/purged">
+                            <i class="fas fa-archive me-1"></i>Purged Projects
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/create_project">
+                            <i class="fas fa-plus me-1"></i>Create New Project
+                        </a></li>
+                    </ul>
+                </div>
+                <a class="nav-link" href="/past-proposals">
+                    <i class="fas fa-file-alt me-1"></i>Past Proposals
+                </a>
+                <a class="nav-link" href="/upload">
+                    <i class="fas fa-upload me-1"></i>Upload
+                </a>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-cogs me-1"></i>Management
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/admin/rfp-types">
+                            <i class="fas fa-tags me-1"></i>RFP Types
+                        </a></li>
+                        <li><a class="dropdown-item" href="/admin/workflows">
+                            <i class="fas fa-sitemap me-1"></i>Workflows
+                        </a></li>
+                        <li><a class="dropdown-item" href="/admin/partners">
+                            <i class="fas fa-handshake me-1"></i>Partners
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/admin/custom-deliverables">
+                            <i class="fas fa-file-plus me-1"></i>Custom Deliverables
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/ai-settings">
+                            <i class="fas fa-robot me-1"></i>AI Settings
+                        </a></li>
+                    </ul>
+                </div>
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user me-1"></i>{{ user.username if user else session.username if session else 'User' }}
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/ai-settings">
+                            <i class="fas fa-robot me-1"></i>AI Settings
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/logout">
+                            <i class="fas fa-sign-out-alt me-1"></i>Logout
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap');
+    
+    .navbar {
+        background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        font-family: 'Poppins', sans-serif;
+    }
+    .navbar-brand {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.25rem;
+    }
+    .nav-link {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .nav-link:hover {
+        background: rgba(252, 175, 23, 0.1);
+        border-radius: 8px;
+        color: #FCAF17 !important;
+    }
+    .dropdown-menu {
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+    }
+    .dropdown-item:hover {
+        background-color: #FCAF17;
+        color: white;
+    }
+</style>

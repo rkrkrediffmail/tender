@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Partner - ITSS RFPplus System</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/itss-theme.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+        .help-card {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #1F4397;
+            border: none;
+        }
+        .btn:hover {
+            background: #10224c;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        @media (max-width: 768px) {
+            .form-row, .form-row-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>ITSS RFPplus
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/projects">Projects</a>
+                <a class="nav-link" href="/settings/partners">Partners</a>
+                <a class="nav-link" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1><i class="fas fa-plus me-2"></i>Add New Partner</h1>
+                <p class="text-muted">Add a technology partner to your ecosystem</p>
+            </div>
+            <a href="/settings/partners" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Partners
+            </a>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'warning' }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    <div class="form-section">
+                        <h4><i class="fas fa-building me-2"></i>Basic Information</h4>
+
+                        <div class="form-row">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Company Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required
+                                       placeholder="Enter partner company name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="company_type" class="form-label">Partner Type *</label>
+                                <select class="form-select" id="company_type" name="company_type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="STRATEGIC">Strategic Partner</option>
+                                    <option value="TECHNOLOGY">Technology Partner</option>
+                                    <option value="VENDOR">Vendor</option>
+                                    <option value="INTEGRATION">Integration Partner</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status *</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="ACTIVE">Active</option>
+                                    <option value="PREFERRED">Preferred</option>
+                                    <option value="INACTIVE">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="website" class="form-label">Website</label>
+                                <input type="url" class="form-control" id="website" name="website"
+                                       placeholder="https://example.com">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                      placeholder="Brief description of the partner company and their services"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4><i class="fas fa-address-card me-2"></i>Contact Information</h4>
+
+                        <div class="form-row">
+                            <div class="mb-3">
+                                <label for="primary_contact" class="form-label">Primary Contact</label>
+                                <input type="text" class="form-control" id="primary_contact" name="primary_contact"
+                                       placeholder="Contact person name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="contact_email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="contact_email" name="contact_email"
+                                       placeholder="contact@partner.com">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="contact_phone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="contact_phone" name="contact_phone"
+                                   placeholder="+1 (555) 123-4567">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4><i class="fas fa-handshake me-2"></i>Business Terms</h4>
+
+                        <div class="form-row-3">
+                            <div class="mb-3">
+                                <label for="revenue_share" class="form-label">Revenue Share (%)</label>
+                                <input type="number" class="form-control" id="revenue_share" name="revenue_share"
+                                       min="0" max="100" step="0.1" placeholder="0.0">
+                                <div class="form-text">Percentage of revenue shared with partner</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="discount_level" class="form-label">Discount Level (%)</label>
+                                <input type="number" class="form-control" id="discount_level" name="discount_level"
+                                       min="0" max="100" step="0.1" placeholder="0.0">
+                                <div class="form-text">Discount received from partner</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="support_level" class="form-label">Support Level</label>
+                                <select class="form-select" id="support_level" name="support_level">
+                                    <option value="BASIC">Basic</option>
+                                    <option value="PREMIUM">Premium</option>
+                                    <option value="ENTERPRISE">Enterprise</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="/settings/partners" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-2"></i>Add Partner
+                        </button>
+                    </div>
+                </form>
+
+                <div class="help-card">
+                    <h4><i class="fas fa-lightbulb me-2"></i>Partner Types Explained</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul>
+                                <li><strong>Strategic:</strong> Long-term partnerships with shared business goals and joint go-to-market strategies</li>
+                                <li><strong>Technology:</strong> Software or hardware solution providers that complement your offerings</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul>
+                                <li><strong>Vendor:</strong> Service or product suppliers for your business operations</li>
+                                <li><strong>Integration:</strong> Specialists in system integration and implementation services</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Tip:</strong> After adding a partner, you can define their products and services to enable AI-powered recommendations during proposal generation.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,12 +1,14 @@
-/* AI Tender Analysis System - Custom Styles */
+/* ITSS RFPplus - Custom Styles */
 
 :root {
-    --primary-color: #0d6efd;
+    --primary-color: #1F4397;
+    --secondary-color: #10224c;
+    --accent-color: #FCAF17;
     --success-color: #198754;
-    --warning-color: #ffc107;
+    --warning-color: #FCAF17;
     --danger-color: #dc3545;
-    --info-color: #0dcaf0;
-    --dark-color: #212529;
+    --info-color: #1F4397;
+    --dark-color: #10224c;
     --light-color: #f8f9fa;
     
     /* Agent Type Colors */
@@ -22,7 +24,7 @@
 
 /* Base Layout */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Poppins', sans-serif;
     background-color: #f5f6fa;
     padding-top: 70px;
 }

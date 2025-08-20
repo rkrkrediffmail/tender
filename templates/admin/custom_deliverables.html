@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Custom Deliverables Management</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .deliverable-card {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+        }
+        .btn {
+            background: #1F4397;
+            border: none;
+        }
+        .btn:hover {
+            background: #10224c;
+        }
+        .icon-selector {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .icon-option {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .icon-option:hover {
+            background: #f0f0f0;
+        }
+        .icon-option.selected {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Common Navigation -->
+    {% include 'common_navbar.html' %}
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2><i class="fas fa-cogs me-2"></i>Custom Deliverables Management</h2>
+                        <p class="text-muted">Create and manage your custom proposal deliverables</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addDeliverableModal">
+                            <i class="fas fa-plus me-2"></i>Add Custom Deliverable
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Deliverables List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-list me-2"></i>Your Custom Deliverables</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="deliverablesList">
+                            {% if deliverables %}
+                                {% for deliverable in deliverables %}
+                                <div class="deliverable-card" data-id="{{ deliverable.id }}">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-8">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="{{ deliverable.icon or 'fas fa-file-alt' }} me-3 text-primary fa-2x"></i>
+                                                <div>
+                                                    <h5 class="mb-1">{{ deliverable.title }}</h5>
+                                                    <p class="text-muted mb-0">{{ deliverable.description }}</p>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <strong>Created:</strong> {{ deliverable.created_at.strftime('%Y-%m-%d %H:%M') if deliverable.created_at else 'Unknown' }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 text-end">
+                                            <button class="btn btn-primary btn-sm me-2" onclick="editDeliverable({{ deliverable.id }})">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteDeliverable({{ deliverable.id }})">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <details>
+                                            <summary class="text-info" style="cursor: pointer;">
+                                                <i class="fas fa-code me-1"></i>View Prompt Template
+                                            </summary>
+                                            <div class="mt-2 p-3 bg-light rounded">
+                                                <small class="text-monospace">{{ deliverable.prompt_template or 'No template defined' }}</small>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5">
+                                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                                    <h4>No Custom Deliverables</h4>
+                                    <p class="text-muted">Create your first custom deliverable to get started</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Deliverable Modal -->
+    <div class="modal fade" id="addDeliverableModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add Custom Deliverable</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="deliverableForm">
+                        <input type="hidden" id="deliverableId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Title *</label>
+                            <input type="text" class="form-control" id="deliverableTitle" required maxlength="100">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Description *</label>
+                            <textarea class="form-control" id="deliverableDescription" rows="3" required maxlength="500"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Icon</label>
+                            <input type="text" class="form-control" id="deliverableIcon" placeholder="fas fa-file-alt">
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showIconSelector()">
+                                    <i class="fas fa-icons"></i> Choose Icon
+                                </button>
+                            </div>
+                            <div id="iconSelector" class="mt-3" style="display: none;">
+                                <div class="icon-selector">
+                                    <div class="icon-option" data-icon="fas fa-file-alt"><i class="fas fa-file-alt"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-chart-bar"><i class="fas fa-chart-bar"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-cogs"><i class="fas fa-cogs"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-building"><i class="fas fa-building"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-rocket"><i class="fas fa-rocket"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-shield-alt"><i class="fas fa-shield-alt"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-users"><i class="fas fa-users"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-dollar-sign"><i class="fas fa-dollar-sign"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-calendar-alt"><i class="fas fa-calendar-alt"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-check-circle"><i class="fas fa-check-circle"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-lightbulb"><i class="fas fa-lightbulb"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-code"><i class="fas fa-code"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-database"><i class="fas fa-database"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-network-wired"><i class="fas fa-network-wired"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-clipboard-list"><i class="fas fa-clipboard-list"></i></div>
+                                    <div class="icon-option" data-icon="fas fa-file-contract"><i class="fas fa-file-contract"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Prompt Template *</label>
+                            <textarea class="form-control" id="deliverablePrompt" rows="8" required
+                                placeholder="Enter the AI prompt template for generating this deliverable. Use placeholders like {project_name}, {requirements}, {company_name}, etc."></textarea>
+                            <div class="form-text">
+                                <strong>Available placeholders:</strong> {project_name}, {requirements}, {company_name}, {contact_person}, {analysis_summary}, {key_constraints}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="saveDeliverable()">
+                        <i class="fas fa-save me-2"></i>Save Deliverable
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showIconSelector() {
+            const selector = document.getElementById('iconSelector');
+            selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Icon selection
+        document.querySelectorAll('.icon-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+                document.getElementById('deliverableIcon').value = this.dataset.icon;
+            });
+        });
+
+        async function saveDeliverable() {
+            const id = document.getElementById('deliverableId').value;
+            const title = document.getElementById('deliverableTitle').value;
+            const description = document.getElementById('deliverableDescription').value;
+            const icon = document.getElementById('deliverableIcon').value || 'fas fa-file-alt';
+            const prompt = document.getElementById('deliverablePrompt').value;
+
+            if (!title || !description || !prompt) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const data = {
+                title: title,
+                description: description,
+                icon: icon,
+                prompt_template: prompt
+            };
+
+            try {
+                const url = id ? 
+                    `/api/admin/custom-deliverables/${id}` : 
+                    '/api/admin/custom-deliverables';
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        function editDeliverable(id) {
+            // Get deliverable data from the page
+            const card = document.querySelector(`[data-id="${id}"]`);
+            const title = card.querySelector('h5').textContent;
+            const description = card.querySelector('.text-muted').textContent;
+            const icon = card.querySelector('i').className;
+            const promptElement = card.querySelector('.text-monospace');
+            const prompt = promptElement ? promptElement.textContent : '';
+
+            // Populate form
+            document.getElementById('deliverableId').value = id;
+            document.getElementById('deliverableTitle').value = title;
+            document.getElementById('deliverableDescription').value = description;
+            document.getElementById('deliverableIcon').value = icon;
+            document.getElementById('deliverablePrompt').value = prompt;
+            document.getElementById('modalTitle').textContent = 'Edit Custom Deliverable';
+
+            // Show modal
+            new bootstrap.Modal(document.getElementById('addDeliverableModal')).show();
+        }
+
+        async function deleteDeliverable(id) {
+            if (!confirm('Are you sure you want to delete this custom deliverable?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/custom-deliverables/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        // Reset form when modal is closed
+        document.getElementById('addDeliverableModal').addEventListener('hidden.bs.modal', function () {
+            document.getElementById('deliverableForm').reset();
+            document.getElementById('deliverableId').value = '';
+            document.getElementById('modalTitle').textContent = 'Add Custom Deliverable';
+            document.getElementById('iconSelector').style.display = 'none';
+            document.querySelectorAll('.icon-option').forEach(opt => opt.classList.remove('selected'));
+        });
+    </script>
+</body>
+</html>

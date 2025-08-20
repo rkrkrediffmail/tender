@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """
-Complete main.py with full functionality - CLEANED VERSION
+Complete main.py with full functionality - PURE PYTHON VERSION
+All HTML templates moved to /templates folder
 """
 
 import os
 import sys
 import uuid
-from flask import Flask, jsonify, render_template_string, request, redirect, url_for, session, flash, send_file, make_response
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, flash, send_file, make_response
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from dotenv import load_dotenv
-from real_analysis_system import get_real_analysis_results, get_real_document_analysis
-from models import Partner, PartnerProduct, PartnerRecommendation
-from agents.partner_recommendation_agent import PartnerRecommendationAgent
-
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +41,36 @@ def login_required(f):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def handle_upload_completion(project_id, uploaded_documents):
+    """Handle completion of document uploads and trigger post-analysis"""
+    try:
+        from models import Project, Document
+
+        # Check if all documents have been processed
+        project_documents = Document.query.filter_by(project_id=project_id).all()
+        all_processed = all(doc.extracted_content for doc in project_documents)
+
+        if all_processed and len(project_documents) > 0:
+            # All documents processed - redirect to post-analysis
+            return {
+                'success': True,
+                'redirect_to': f'/post_analysis/{project_id}',
+                'message': 'Documents processed successfully. Starting post-upload analysis...'
+            }
+        else:
+            # Still processing
+            return {
+                'success': True,
+                'status': 'processing',
+                'message': 'Documents still being processed...'
+            }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Error checking upload completion: {str(e)}'
+        }
+
 def create_app():
     app = Flask(__name__)
 
@@ -69,11 +96,33 @@ def create_app():
         print("⚠️ ANTHROPIC_API_KEY not configured")
         app.config['DOCUMENT_PROCESSOR'] = None
 
-    # Create tables
+    # Create tables and initialize database
     with app.app_context():
         try:
+            # Create all tables (including new ones)
             db.create_all()
             print("✅ Database tables created successfully")
+            
+            # Verify AI analysis table exists
+            try:
+                from models import AIAnalysisResult
+                # Test if the table exists by doing a simple query
+                AIAnalysisResult.query.count()
+                print("✅ AI Analysis Results table verified")
+            except Exception as table_error:
+                print(f"⚠️ AI Analysis table issue: {table_error}")
+                # Force recreation of all tables
+                db.create_all()
+                print("✅ Database schema updated with AI analysis support")
+            
+            # Initialize workflow configuration
+            try:
+                from workflow_manager import setup_default_config
+                setup_default_config()
+                print("✅ Workflow configuration initialized")
+            except Exception as wf_error:
+                print(f"⚠️ Workflow setup error: {wf_error}")
+                
         except Exception as e:
             print(f"❌ Database error: {e}")
 
@@ -141,80 +190,15 @@ def create_app():
     # AUTHENTICATION ROUTES
     # ========================================
 
-    @app.route('/login')
+    @app.route('/login', methods=['GET', 'POST'])
     def login():
-        """Login page"""
-        if 'username' in session:
-            return redirect('/')
+        """Login page and handler"""
+        if request.method == 'GET':
+            if 'username' in session:
+                return redirect('/')
+            return render_template('auth/login.html')
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Login - Tender Analysis System</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    /*background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);*/
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin: 0;
-                }
-                .login-container {
-                    background: white;
-                    padding: 40px;
-                    border-radius: 10px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                    width: 100%;
-                    max-width: 400px;
-                }
-                .form-group { margin: 20px 0; }
-                label { display: block; margin-bottom: 5px; font-weight: bold; }
-                input[type="text"], input[type="password"] {
-                    width: 100%;
-                    padding: 12px;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    box-sizing: border-box;
-                }
-                .btn {
-                    width: 100%;
-                    padding: 12px;
-                    background: #667eea;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 16px;
-                }
-                .btn:hover { background: #5a6fd8; }
-                .error { color: #dc3545; margin-top: 10px; }
-            </style>
-        </head>
-        <body>
-            <div class="login-container">
-                <h2 style="text-align: center; margin-bottom: 30px;">🔐 Tender Analysis System</h2>
-                <form method="POST" action="/login">
-                    <div class="form-group">
-                        <label for="username">Username:</label>
-                        <input type="text" id="username" name="username" value="admin" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password:</label>
-                        <input type="password" id="password" name="password" value="admin123" required>
-                    </div>
-                    <button type="submit" class="btn">Login</button>
-                </form>
-            </div>
-        </body>
-        </html>
-        ''')
-
-    @app.route('/login', methods=['POST'])
-    def handle_login():
-        """Handle login"""
+        # POST request - handle login
         username = request.form.get('username')
         password = request.form.get('password')
 
@@ -245,446 +229,704 @@ def create_app():
         session.clear()
         return redirect('/login')
 
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        """User registration"""
+        if request.method == 'GET':
+            return render_template('auth/register.html')
+
+        # POST request - handle registration
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        try:
+            from models import User
+
+            # Check if user exists
+            if User.query.filter_by(username=username).first():
+                flash('Username already exists', 'error')
+                return render_template('auth/register.html')
+
+            # Create new user
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+
+            flash('Registration successful! Please log in.', 'success')
+            return redirect('/login')
+
+        except Exception as e:
+            flash(f'Registration error: {e}', 'error')
+            return render_template('auth/register.html')
+
     # ========================================
     # MAIN DASHBOARD
     # ========================================
 
     @app.route('/')
-    def index():
+    @login_required
+    def dashboard():
         """Main dashboard"""
-        if 'username' not in session:
-            return redirect('/login')
-
         system_status = get_system_status()
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Tender Analysis System - Dashboard</title>
-            <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    margin: 0;
-                    padding: 20px;
-                    /*background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);*/
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    background: white;
-                    border-radius: 10px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                    overflow: hidden;
-                }
-                .header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 20px 30px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .nav {
-                    background: #f8f9fa;
-                    padding: 15px 30px;
-                    border-bottom: 1px solid #e9ecef;
-                }
-                .nav a {
-                    color: #495057;
-                    text-decoration: none;
-                    margin-right: 20px;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    transition: background 0.3s;
-                }
-                .nav a:hover { background: #e9ecef; }
-                .nav a.active { background: #667eea; color: white; }
-                .content { padding: 30px; }
-                .btn {
-                    display: inline-block;
-                    padding: 12px 24px;
-                    background: #667eea;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin: 5px;
-                    transition: background 0.3s;
-                    border: none;
-                    cursor: pointer;
-                }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; }
-                .btn-success:hover { background: #218838; }
-                .btn-danger { background: #dc3545; }
-                .btn-danger:hover { background: #c82333; }
-                .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; }
-                @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-                .card {
-                    background: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 8px;
-                    border: 1px solid #e9ecef;
-                    text-align: center;
-                }
-                .card h3 { margin-top: 0; color: #495057; }
-                .card .number { font-size: 2em; font-weight: bold; color: #667eea; }
-                .status-indicator {
-                    display: inline-block;
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    margin-right: 8px;
-                }
-                .status-good { background: #28a745; }
-                .status-warning { background: #ffc107; }
-                .status-error { background: #dc3545; }
-                .user-info { color: white; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>🚀 Tender Analysis System</h1>
-                        <p>AI-Powered Multi-Document Analysis & Proposal Generation</p>
-                    </div>
-                    <div class="user-info">
-                        <p>Welcome, {{ session.username }}!</p>
-                        <a href="/logout" class="btn btn-danger">Logout</a>
-                    </div>
-                </div>
+        try:
+            from models import User, Project
+            user = User.query.filter_by(username=session['username']).first()
+            user_projects = Project.query.filter_by(user_id=user.id).limit(5).all()
+        except Exception as e:
+            user_projects = []
 
-                <div class="nav">
-                    <a href="/" class="active">🏠 Dashboard</a>
-                    <a href="/projects">📁 My Projects</a>
-                    <a href="/upload">📄 Upload Documents</a>
-                    <a href="/settings/partners">🤝 Partner Management</a>
-                    <a href="/health">🔍 System Health</a>
-                </div>
-                <div class="content">
-                    {% if system_status.ready_for_upload %}
-                    <!--div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 5px solid #28a745; margin-bottom: 20px;">
-                        <h2>🎉 System Ready!</h2>
-                        <p>All components are working. You can start uploading and analyzing documents!</p>
-                        <a href="/projects" class="btn btn-success">📁 Go to Projects</a>
-                        <a href="/upload" class="btn btn-success">📄 Upload Documents</a>
-                    </div-->
-                    {% else %}
-                    <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 5px solid #ffc107; margin-bottom: 20px;">
-                        <h2>⚙️ System Setup</h2>
-                        <p>Some components need attention before you can use all features.</p>
-                    </div>
-                    {% endif %}
-
-                    <div class="grid">
-                        <div class="card">
-                            <h3>📊 Projects</h3>
-                            <div class="number">{{ system_status.projects_count }}</div>
-                            <p>Active projects</p>
-                            <a href="/projects" class="btn">View Projects</a>
-                        </div>
-
-                        <div class="card">
-                            <h3>📄 Documents</h3>
-                            <div class="number">{{ system_status.documents_count }}</div>
-                            <p>Uploaded documents</p>
-                            <a href="/upload" class="btn">Upload More</a>
-                        </div>
-
-                        <div class="card">
-                            <h3>🤖 AI Analysis</h3>
-                            <div class="number">
-                                {% if system_status.api_keys_configured %}✅{% else %}❌{% endif %}
-                            </div>
-                            <p>AI systems status</p>
-                            <a href="/health" class="btn">Check Status</a>
-                        </div>
-                    </div>
-
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <h3>🔌 System Components</h3>
-                        <p>
-                            <span class="status-indicator status-good"></span>
-                            <strong>Web Application:</strong> Running
-                        </p>
-                        <p>
-                            <span class="status-indicator {% if system_status.database_status == 'connected' %}status-good{% else %}status-error{% endif %}"></span>
-                            <strong>Database:</strong> {{ system_status.database_status }}
-                        </p>
-                        <p>
-                            <span class="status-indicator {% if 'connected' in system_status.celery_status %}status-good{% else %}status-warning{% endif %}"></span>
-                            <strong>Background Tasks:</strong> {{ system_status.celery_status.replace('_', ' ').title() }}
-                        </p>
-                        <p>
-                            <span class="status-indicator {% if system_status.api_keys_configured %}status-good{% else %}status-warning{% endif %}"></span>
-                            <strong>AI APIs:</strong> {% if system_status.api_keys_configured %}Configured{% else %}Not configured{% endif %}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        ''',
-        system_status=system_status,
-        session=session
-        )
+        return render_template('dashboard.html',
+                             system_status=system_status,
+                             user_projects=user_projects,
+                             user=session.get('username'))
 
     # ========================================
     # PROJECT MANAGEMENT
     # ========================================
 
     @app.route('/projects')
+    @login_required
     def projects():
         """Projects page"""
-        if 'username' not in session:
-            return redirect('/login')
-
         try:
             from models import User, Project
             user = User.query.filter_by(username=session['username']).first()
             if not user:
                 return redirect('/login')
 
-            user_projects = Project.query.filter_by(user_id=user.id).all()
+            # Only show active projects by default (exclude purged)
+            user_projects = Project.query.filter_by(user_id=user.id).filter(Project.status != 'purged').all()
 
         except Exception as e:
             user_projects = []
             flash(f"Error loading projects: {e}")
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>My Projects - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; }
-                .btn-success:hover { background: #218838; }
-                .project-card {
-                    border: 1px solid #ddd;
-                    padding: 20px;
-                    margin: 15px 0;
-                    border-radius: 8px;
-                    background: #f8f9fa;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .project-info h3 { margin: 0 0 10px 0; color: #495057; }
-                .project-info p { margin: 5px 0; color: #6c757d; }
-                .project-actions { display: flex; gap: 10px; }
-                .no-projects {
-                    text-align: center;
-                    padding: 40px;
-                    color: #6c757d;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>📁 My Projects</h1>
-                    <div>
-                        <a href="/" class="btn">← Dashboard</a>
-                        <button onclick="createProject()" class="btn btn-success">+ Create New Project</button>
-                    </div>
-                </div>
+        return render_template('projects.html', user_projects=user_projects)
 
-                {% if user_projects %}
-                    {% for project in user_projects %}
-                    <div class="project-card">
-                        <div class="project-info">
-                            <h3>{{ project.name }}</h3>
-                            <p><strong>Status:</strong> {{ project.status }}</p>
-                            <p><strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d') if project.created_at else 'Unknown' }}</p>
-                            {% if project.description %}
-                            <p><strong>Description:</strong> {{ project.description[:100] }}...</p>
-                            {% endif %}
-                        </div>
-                        <div class="project-actions">
-                            <a href="/project/{{ project.id }}" class="btn">View Details</a>
-                            <a href="/upload?project_id={{ project.id }}" class="btn">Upload Docs</a>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="no-projects">
-                        <h3>🚀 No Projects Yet</h3>
-                        <p>Create your first project to start analyzing RFP documents!</p>
-                        <button onclick="createProject()" class="btn btn-success">Create Your First Project</button>
-                    </div>
-                {% endif %}
-            </div>
+    @app.route('/create_project', methods=['GET', 'POST'])
+    @login_required
+    def create_project_page():
+        """Create new project with workflow features"""
+        if request.method == 'GET':
+            # Get available RFP types for the form
+            from workflow_manager import workflow_manager
+            rfp_types = workflow_manager.get_available_rfp_types()
+            return render_template('create_project.html', rfp_types=rfp_types)
 
-            <script>
-            function createProject() {
-                const name = prompt("Enter project name:");
-                if (name) {
-                    const description = prompt("Enter project description (optional):");
+        # POST request - handle project creation
+        try:
+            from models import User, Project
+            from workflow_manager import workflow_manager
+            
+            user = User.query.filter_by(username=session['username']).first()
 
-                    fetch('/api/projects', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            name: name,
-                            description: description || ''
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Project created successfully!');
-                            location.reload();
-                        } else {
-                            alert('Error: ' + data.error);
-                        }
-                    })
-                    .catch(error => {
-                        alert('Error: ' + error);
-                    });
-                }
-            }
-            </script>
-        </body>
-        </html>
-        ''', user_projects=user_projects)
+            project = Project(
+                name=request.form.get('name'),
+                description=request.form.get('description'),
+                client_name=request.form.get('client_name'),
+                rfp_type=request.form.get('rfp_type', 'implementation'),
+                priority=request.form.get('priority', 'medium'),
+                workflow_stage='created',
+                submitted_by=user.id,
+                user_id=user.id,
+                status='active',
+                created_at=datetime.utcnow()
+            )
 
-    @app.route('/debug-routes')
-    def debug_routes():
-        routes = []
-        for rule in app.url_map.iter_rules():
-            routes.append({
-                'endpoint': rule.endpoint,
-                'methods': list(rule.methods),
-                'rule': rule.rule
-            })
-        return jsonify(routes)
+            db.session.add(project)
+            db.session.commit()
+
+            # Add stakeholders if provided
+            approver_emails = request.form.getlist('approver_emails[]')
+            approver_roles = request.form.getlist('approver_roles[]')
+            
+            for email, role in zip(approver_emails, approver_roles):
+                if email.strip():  # Only add non-empty emails
+                    workflow_manager.add_stakeholder(
+                        project_id=project.id,
+                        email=email.strip(),
+                        role=role,
+                        stage='authorized'  # Default to first approval stage
+                    )
+
+            flash('Project created successfully with workflow configured!', 'success')
+            return redirect(f'/project/{project.id}')
+
+        except Exception as e:
+            flash(f'Error creating project: {e}', 'error')
+            from workflow_manager import workflow_manager
+            rfp_types = workflow_manager.get_available_rfp_types()
+            return render_template('create_project.html', rfp_types=rfp_types)
 
     @app.route('/project/<project_id>')
-    @app.route('/projects/<project_id>/details')
+    @login_required
     def project_detail(project_id):
         """Project detail page"""
-        if 'username' not in session:
-            return redirect('/login')
-
         try:
-            from models import User, Project, Document
+            from models import User, Project, Document, RFPDocument
             user = User.query.filter_by(username=session['username']).first()
             project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
-            documents = Document.query.filter_by(project_id=project_id).all()
+            
+            # Get both old documents and new RFP documents
+            old_documents = Document.query.filter_by(project_id=project_id).all()
+            rfp_documents = RFPDocument.query.filter_by(project_id=project_id).all()
+            
+            # Combine both document types
+            documents = old_documents + rfp_documents
 
+            return render_template('project_detail.html',
+                                 project=project,
+                                 documents=documents,
+                                 documents_count=len(documents),
+                                 user=user)
         except Exception as e:
             flash(f"Error loading project: {e}")
             return redirect('/projects')
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{{ project.name }} - Project Details</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; }
-                .card { background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 8px; border: 1px solid #e9ecef; }
-                .document-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 15px;
-                    background: white;
-                    margin: 10px 0;
-                    border-radius: 5px;
-                    border: 1px solid #ddd;
+    # ========================================
+    # POST-UPLOAD ANALYSIS ROUTES
+    # ========================================
+
+    @app.route('/post_analysis/<project_id>')
+    @login_required
+    def post_analysis_page(project_id):
+        """Display post-upload analysis page"""
+        try:
+            from models import User, Project
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+
+            return render_template('post_analysis.html', project=project)
+        except Exception as e:
+            flash(f'Error loading analysis page: {e}', 'error')
+            return redirect('/projects')
+
+    @app.route('/api/post_upload_analysis/<project_id>')
+    @login_required
+    def get_post_upload_analysis(project_id):
+        """Get stored post-upload analysis results or indicate if fresh analysis is needed"""
+        try:
+            from models import User, Project, Document
+            from ai_response_manager import AIResponseManager
+
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            documents = Document.query.filter_by(project_id=str(project_id)).all()
+
+            if not documents:
+                return jsonify({'error': 'No documents found for analysis'}), 400
+
+            # Check for existing stored AI responses
+            clarification_response = AIResponseManager.get_latest_response(project_id, 'clarification_extraction')
+            risk_response = AIResponseManager.get_latest_response(project_id, 'risk_analysis')
+            deadline_response = AIResponseManager.get_latest_response(project_id, 'deadline_extraction')
+            go_no_go_response = AIResponseManager.get_latest_response(project_id, 'go_no_go_recommendation')
+
+            # If we have stored results, return them
+            if clarification_response and risk_response and deadline_response and go_no_go_response:
+                print("📋 Returning stored AI analysis results...")
+                
+                results = {
+                    'clarification_items': clarification_response.parsed_response or [],
+                    'risks_constraints': risk_response.parsed_response or [],
+                    'deadlines_milestones': deadline_response.parsed_response or [],
+                    'go_no_go_recommendation': go_no_go_response.parsed_response or {},
+                    'analysis_timestamp': go_no_go_response.created_at.isoformat(),
+                    'documents_analyzed': len(documents),
+                    'from_stored_results': True,
+                    'last_analysis_date': go_no_go_response.created_at.strftime('%B %d, %Y at %I:%M %p'),
+                    'ai_provider_used': go_no_go_response.ai_provider,
+                    'stored_response_ids': {
+                        'clarification': clarification_response.response_id,
+                        'risks': risk_response.response_id,
+                        'deadlines': deadline_response.response_id,
+                        'go_no_go': go_no_go_response.response_id
+                    }
                 }
-                .status-badge {
-                    padding: 4px 8px;
-                    border-radius: 12px;
-                    font-size: 12px;
-                    font-weight: bold;
+
+                return jsonify({
+                    'success': True,
+                    'analysis_results': results,
+                    'processing_time': 0.01,  # Instant since stored
+                    'message': 'Displaying stored analysis results'
+                })
+            
+            # If no complete stored results, indicate fresh analysis is available
+            else:
+                partial_results = {}
+                missing_analyses = []
+                
+                if clarification_response:
+                    partial_results['clarification_items'] = clarification_response.parsed_response or []
+                else:
+                    missing_analyses.append('clarification_extraction')
+                
+                if risk_response:
+                    partial_results['risks_constraints'] = risk_response.parsed_response or []
+                else:
+                    missing_analyses.append('risk_analysis')
+                
+                if deadline_response:
+                    partial_results['deadlines_milestones'] = deadline_response.parsed_response or []
+                else:
+                    missing_analyses.append('deadline_extraction')
+                
+                if go_no_go_response:
+                    partial_results['go_no_go_recommendation'] = go_no_go_response.parsed_response or {}
+                else:
+                    missing_analyses.append('go_no_go_recommendation')
+
+                return jsonify({
+                    'success': False,
+                    'needs_fresh_analysis': True,
+                    'partial_results': partial_results,
+                    'missing_analyses': missing_analyses,
+                    'documents_count': len(documents),
+                    'message': f'Analysis incomplete. Missing: {", ".join(missing_analyses)}'
+                })
+
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/post_upload_analysis/<project_id>/run-fresh', methods=['POST'])
+    @login_required
+    def run_fresh_post_upload_analysis(project_id):
+        """Run fresh comprehensive post-upload analysis for go/no-go decision"""
+        import time
+        start_time = time.time()
+        
+        try:
+            from models import User, Project, Document, AIAnalysisResult
+            from real_analysis_system import RealAnalysisSystem
+
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            documents = Document.query.filter_by(project_id=str(project_id)).all()
+
+            if not documents:
+                return jsonify({'error': 'No documents found for analysis'}), 400
+
+            # Initialize analysis system
+            analysis_system = RealAnalysisSystem(project)
+
+            # Combine all document content
+            combined_content = ""
+            for doc in documents:
+                if doc.extracted_content:
+                    combined_content += f"\n\n--- {doc.filename} ---\n{doc.extracted_content}"
+
+            if not combined_content.strip():
+                return jsonify({'error': 'No content extracted from documents'}), 400
+
+            # Perform new analyses with progress tracking
+            print("🚀 Starting fresh comprehensive AI analysis...")
+            clarification_items = analysis_system.extract_clarification_items(combined_content, project_id=project_id)
+            risks_constraints = analysis_system.identify_risks_and_constraints(combined_content, project_id=project_id)
+            deadlines_milestones = analysis_system.extract_deadlines_and_milestones(combined_content, project_id=project_id)
+
+            # Generate go/no-go recommendation
+            go_no_go_recommendation = analysis_system.generate_go_no_go_recommendation(
+                clarification_items, risks_constraints, deadlines_milestones, project_id=project_id
+            )
+            print("✅ Fresh analysis completed successfully")
+
+            # Prepare results
+            results = {
+                'clarification_items': clarification_items,
+                'risks_constraints': risks_constraints,
+                'deadlines_milestones': deadlines_milestones,
+                'go_no_go_recommendation': go_no_go_recommendation,
+                'analysis_timestamp': datetime.now().isoformat(),
+                'documents_analyzed': len(documents),
+                'from_stored_results': False,
+                'total_content_length': len(combined_content)
+            }
+
+            # Store analysis results in database
+            processing_time = time.time() - start_time
+            
+            try:
+                from models import AIAnalysisResult
+                ai_analysis = AIAnalysisResult(
+                    project_id=project_id,
+                    analysis_type='post_upload',
+                    results=results,
+                    ai_model_used='claude-sonnet-4-20250514',
+                    processing_time_seconds=processing_time,
+                    status='completed'
+                )
+                
+                db.session.add(ai_analysis)
+                db.session.commit()
+                print(f"✅ Fresh analysis stored with ID: {ai_analysis.analysis_id}")
+            except Exception as db_error:
+                print(f"Warning: Could not store analysis in AIAnalysisResult: {db_error}")
+
+            return jsonify({
+                'success': True, 
+                'analysis_results': results,
+                'processing_time': processing_time,
+                'message': 'Fresh analysis completed successfully'
+            })
+
+        except Exception as e:
+            print(f"Fresh analysis error: {e}")
+            # Store failed analysis
+            try:
+                processing_time = time.time() - start_time
+                failed_analysis = AIAnalysisResult(
+                    project_id=project_id,
+                    analysis_type='post_upload',
+                    results={},
+                    status='failed',
+                    error_message=str(e),
+                    processing_time_seconds=processing_time
+                )
+                db.session.add(failed_analysis)
+                db.session.commit()
+            except:
+                pass
+                
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/debug/analysis/<project_id>', methods=['GET'])
+    @login_required
+    def debug_analysis(project_id):
+        """Debug endpoint to test individual analysis components"""
+        try:
+            from models import User, Project, Document
+            from real_analysis_system import RealAnalysisSystem
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            documents = Document.query.filter_by(project_id=str(project_id)).all()
+            
+            if not documents:
+                return jsonify({'error': 'No documents found'}), 400
+            
+            # Get test content
+            combined_content = ""
+            for doc in documents:
+                if doc.extracted_content:
+                    combined_content += f"\n\n--- {doc.filename} ---\n{doc.extracted_content}"
+            
+            if not combined_content.strip():
+                return jsonify({'error': 'No content extracted from documents'}), 400
+            
+            # Initialize analysis system
+            analysis_system = RealAnalysisSystem(project)
+            
+            # Test component requested
+            component = request.args.get('component', 'all')
+            results = {}
+            
+            if component in ['all', 'clarification']:
+                print("🔍 Testing clarification items extraction...")
+                results['clarification_items'] = analysis_system.extract_clarification_items(combined_content[:5000])
+                
+            if component in ['all', 'risks']:
+                print("🔍 Testing risks and constraints extraction...")
+                results['risks_constraints'] = analysis_system.identify_risks_and_constraints(combined_content[:5000])
+                
+            if component in ['all', 'deadlines']:
+                print("🔍 Testing deadlines and milestones extraction...")
+                results['deadlines_milestones'] = analysis_system.extract_deadlines_and_milestones(combined_content[:5000])
+            
+            if component in ['all', 'recommendation']:
+                print("🔍 Testing go/no-go recommendation...")
+                # Use minimal test data for recommendation
+                test_clarifications = [{"category": "TEST", "impact_level": "Low"}]
+                test_risks = [{"risk_type": "TEST", "severity_level": "Low"}] 
+                test_deadlines = [{"type": "TEST", "critical_level": "Standard"}]
+                
+                results['go_no_go_recommendation'] = analysis_system.generate_go_no_go_recommendation(
+                    test_clarifications, test_risks, test_deadlines
+                )
+            
+            # Add debug information
+            results['debug_info'] = {
+                'ai_providers_available': len(analysis_system.ai_manager.available_providers),
+                'content_length': len(combined_content),
+                'documents_count': len(documents),
+                'component_tested': component,
+                'vector_store_available': analysis_system.proposal_manager is not None
+            }
+            
+            return jsonify(results)
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Debug analysis failed',
+                'details': str(e)
+            }), 500
+
+    # ========================================
+    # WORKFLOW MANAGEMENT API ENDPOINTS
+    # ========================================
+
+    @app.route('/api/workflow/transition/<project_id>', methods=['POST'])
+    @login_required
+    def transition_workflow(project_id):
+        """Transition project to next workflow stage"""
+        try:
+            from workflow_manager import workflow_manager
+            
+            data = request.get_json()
+            to_stage = data.get('to_stage')
+            comments = data.get('comments', '')
+            
+            # Get current user email
+            from models import User
+            user = User.query.filter_by(username=session['username']).first()
+            actor_email = user.email if user else session['username']
+            actor_name = user.full_name if user and user.full_name else actor_email
+            
+            result = workflow_manager.transition_workflow(
+                project_id=project_id,
+                to_stage=to_stage,
+                actor_email=actor_email,
+                actor_name=actor_name,
+                comments=comments
+            )
+            
+            if result['success']:
+                return jsonify(result)
+            else:
+                return jsonify(result), 400
+                
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/workflow/stakeholders/<project_id>', methods=['GET', 'POST'])
+    @login_required
+    def manage_project_stakeholders(project_id):
+        """Get or add project stakeholders"""
+        from workflow_manager import workflow_manager
+        
+        if request.method == 'GET':
+            try:
+                stakeholders = workflow_manager.get_project_stakeholders(project_id)
+                return jsonify({'stakeholders': stakeholders})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        elif request.method == 'POST':
+            try:
+                data = request.get_json()
+                result = workflow_manager.add_stakeholder(
+                    project_id=project_id,
+                    email=data.get('email'),
+                    name=data.get('name'),
+                    role=data.get('role', 'approver'),
+                    stage=data.get('stage', 'authorized'),
+                    notification_preference=data.get('notification_preference', 'email'),
+                    teams_webhook=data.get('teams_webhook')
+                )
+                
+                if result['success']:
+                    return jsonify(result)
+                else:
+                    return jsonify(result), 400
+                    
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/workflow/history/<project_id>')
+    @login_required
+    def get_workflow_history(project_id):
+        """Get workflow history for a project"""
+        try:
+            from workflow_manager import workflow_manager
+            history = workflow_manager.get_workflow_history(project_id)
+            return jsonify({'history': history})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/workflow/config/types')
+    @login_required
+    def get_rfp_types():
+        """Get available RFP types"""
+        try:
+            from workflow_manager import workflow_manager
+            types = workflow_manager.get_available_rfp_types()
+            return jsonify({'rfp_types': types})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/workflow/config/stages')
+    @login_required
+    def get_workflow_stages():
+        """Get available workflow stages"""
+        try:
+            from workflow_manager import workflow_manager
+            stages = workflow_manager.get_workflow_stages()
+            return jsonify({'workflow_stages': stages})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/project/<project_id>/workflow')
+    @login_required
+    def workflow_management(project_id):
+        """Workflow management page for a project"""
+        try:
+            from models import User, Project
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            
+            return render_template('workflow_management.html', project=project)
+            
+        except Exception as e:
+            flash(f'Error loading workflow management: {e}', 'error')
+            return redirect(f'/project/{project_id}')
+
+    # ========================================
+    # AI ANALYSIS RESULTS MANAGEMENT
+    # ========================================
+
+    @app.route('/project/<project_id>/analysis-history')
+    @login_required
+    def view_analysis_history(project_id):
+        """View all AI analysis results for a project"""
+        try:
+            from models import User, Project, AIAnalysisResult
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            
+            # Get all analysis results for this project
+            analyses = AIAnalysisResult.query.filter_by(project_id=project_id)\
+                                           .order_by(AIAnalysisResult.created_at.desc())\
+                                           .all()
+            
+            return render_template('analysis_history.html', 
+                                 project=project, 
+                                 analyses=analyses)
+        except Exception as e:
+            flash(f'Error loading analysis history: {e}', 'error')
+            return redirect(f'/project/{project_id}')
+
+    @app.route('/api/analysis/<analysis_id>')
+    @login_required
+    def get_analysis_result(analysis_id):
+        """Get specific analysis result"""
+        try:
+            from models import User, AIAnalysisResult
+            
+            user = User.query.filter_by(username=session['username']).first()
+            analysis = AIAnalysisResult.query.filter_by(analysis_id=analysis_id).first_or_404()
+            
+            # Verify user has access to this project
+            project = Project.query.filter_by(id=analysis.project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'error': 'Access denied'}), 403
+            
+            # Mark as viewed
+            analysis.mark_viewed()
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'analysis': {
+                    'id': analysis.analysis_id,
+                    'type': analysis.analysis_type,
+                    'results': analysis.results,
+                    'created_at': analysis.created_at.isoformat(),
+                    'processing_time': analysis.processing_time_seconds,
+                    'ai_model': analysis.ai_model_used,
+                    'status': analysis.status,
+                    'viewed_count': analysis.viewed_count
                 }
-                .status-completed { background: #d4edda; color: #155724; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>📁 {{ project.name }}</h1>
-                        <p style="color: #6c757d;">{{ project.description or 'No description provided' }}</p>
-                    </div>
-                    <div>
-                        <a href="/projects" class="btn">← Back to Projects</a>
-                        <a href="/upload?project_id={{ project.id }}" class="btn btn-success">📄 Upload Documents</a>
-                    </div>
-                </div>
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-                <div class="card">
-                    <h3>📊 Project Information</h3>
-                    <p><strong>Status:</strong> {{ project.status.title() }}</p>
-                    <p><strong>Created:</strong> {{ project.created_at.strftime('%B %d, %Y') if project.created_at else 'Unknown' }}</p>
-                    <p><strong>Total Documents:</strong> {{ documents|length }}</p>
-                </div>
+    @app.route('/project/<project_id>/analysis/<analysis_id>')
+    @login_required
+    def view_analysis_detail(project_id, analysis_id):
+        """View detailed analysis result page"""
+        try:
+            from models import User, Project, AIAnalysisResult
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            analysis = AIAnalysisResult.query.filter_by(analysis_id=analysis_id, project_id=project_id).first_or_404()
+            
+            # Mark as viewed
+            analysis.mark_viewed()
+            db.session.commit()
+            
+            return render_template('analysis_detail.html', 
+                                 project=project, 
+                                 analysis=analysis)
+        except Exception as e:
+            flash(f'Error loading analysis: {e}', 'error')
+            return redirect(f'/project/{project_id}')
 
-                <div class="card">
-                    <h3>📄 Documents</h3>
-                    {% if documents %}
-                        {% for doc in documents %}
-                        <div class="document-item">
-                            <div>
-                                <strong>{{ doc.original_filename or doc.filename }}</strong>
-                                <p style="margin: 5px 0; color: #6c757d;">
-                                    Uploaded: {{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') if doc.uploaded_at else 'Unknown' }}
-                                    | Size: {{ "%.1f"|format(doc.file_size/1024/1024) if doc.file_size else '0' }} MB
-                                </p>
-                            </div>
-                            <div>
-                                <span class="status-badge status-completed">✅ Ready</span>
-                                <a href="/document/{{ doc.id }}" class="btn" style="margin-left: 10px;">View Analysis</a>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div style="text-align: center; padding: 40px; color: #6c757d;">
-                            <h4>📄 No Documents Yet</h4>
-                            <p>Upload RFP documents to start AI analysis</p>
-                            <a href="/upload?project_id={{ project.id }}" class="btn btn-success">Upload First Document</a>
-                        </div>
-                    {% endif %}
-                </div>
+    @app.route('/api/analysis/<analysis_id>/feedback', methods=['POST'])
+    @login_required
+    def submit_analysis_feedback(analysis_id):
+        """Submit user feedback on analysis quality"""
+        try:
+            from models import User, AIAnalysisResult
+            
+            data = request.get_json()
+            rating = data.get('rating')
+            feedback = data.get('feedback', '')
+            
+            user = User.query.filter_by(username=session['username']).first()
+            analysis = AIAnalysisResult.query.filter_by(analysis_id=analysis_id).first_or_404()
+            
+            # Verify user has access to this project
+            project = Project.query.filter_by(id=analysis.project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'error': 'Access denied'}), 403
+            
+            # Update feedback
+            analysis.user_rating = rating
+            analysis.user_feedback = feedback
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Feedback submitted successfully'})
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-                {% if documents %}
-                <div class="card">
-                    <h3>🤖 AI Analysis Summary</h3>
-                    <p>Analysis of {{ documents|length }} document(s) in this project:</p>
-                    <ul>
-                        <li>✅ Documents processed and analyzed</li>
-                        <li>🔍 Requirements extracted and categorized</li>
-                        <li>📊 Ready for proposal generation</li>
-                    </ul>
-                    <a href="/analysis/{{ project.id }}" class="btn btn-success">📊 View Full Analysis</a>
-                </div>
-                {% endif %}
-            </div>
-        </body>
-        </html>
-        ''', project=project, documents=documents)
+    # ========================================
+    # DOCUMENT UPLOAD & PROCESSING
+    # ========================================
 
+    @app.route('/upload')
+    @login_required
+    def upload_page():
+        """Upload page"""
+        project_id = request.args.get('project_id')
 
-# ========================================
-# PARTNER MANAGEMENT ROUTES
-# ========================================
+        try:
+            from models import User, Project
+            user = User.query.filter_by(username=session['username']).first()
+            user_projects = Project.query.filter_by(user_id=user.id).all()
+
+            selected_project = None
+            if project_id:
+                selected_project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+
+        except Exception as e:
+            user_projects = []
+            selected_project = None
+
+        return render_template('upload.html',
+                             user_projects=user_projects,
+                             project_id=project_id,
+                             selected_project=selected_project)
+
+    # ========================================
+    # PARTNER MANAGEMENT ROUTES
+    # ========================================
 
     @app.route('/settings/partners')
     @login_required
@@ -697,282 +939,43 @@ def create_app():
             partners = []
             flash(f"Error loading partners: {e}")
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Partner Management - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .partner-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin: 20px 0; }
-                .partner-card {
-                    background: #f8f9fa;
-                    border: 1px solid #e9ecef;
-                    border-radius: 8px;
-                    padding: 20px;
-                    transition: transform 0.2s;
-                }
-                .partner-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-                .partner-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-                .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-                .status-active { background: #d4edda; color: #155724; }
-                .status-preferred { background: #cce5ff; color: #004085; }
-                .status-inactive { background: #f8d7da; color: #721c24; }
-                .partner-stats { display: flex; justify-content: space-around; margin: 15px 0; }
-                .stat { text-align: center; }
-                .stat-number { font-size: 1.5em; font-weight: bold; color: #667eea; }
-                .partner-actions { display: flex; gap: 10px; margin-top: 15px; }
-                .no-partners { text-align: center; padding: 60px; color: #6c757d; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>🤝 Partner Management</h1>
-                        <p style="color: #6c757d;">Manage partner companies and their products for cross-sell opportunities</p>
-                    </div>
-                    <div>
-                        <a href="/" class="btn">← Dashboard</a>
-                        <a href="/settings/partners/add" class="btn btn-success">+ Add Partner</a>
-                    </div>
-                </div>
-
-                {% if partners %}
-                <div class="partner-grid">
-                    {% for partner in partners %}
-                    <div class="partner-card">
-                        <div class="partner-header">
-                            <h4 style="margin: 0;">{{ partner.name }}</h4>
-                            <span class="status-badge status-{{ partner.status.lower() }}">
-                                {{ partner.status }}
-                            </span>
-                        </div>
-
-                        <p style="color: #6c757d; margin: 10px 0;">
-                            {{ partner.description or 'No description available' }}
-                        </p>
-
-                        <div class="partner-stats">
-                            <div class="stat">
-                                <div class="stat-number">{{ partner.products|length }}</div>
-                                <small>Products</small>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-number">{{ partner.company_type }}</div>
-                                <small>Type</small>
-                            </div>
-                        </div>
-
-                        {% if partner.contact_email %}
-                        <p style="font-size: 14px; margin: 10px 0;">
-                            <i>📧</i> {{ partner.contact_email }}
-                        </p>
-                        {% endif %}
-
-                        {% if partner.website %}
-                        <p style="font-size: 14px; margin: 10px 0;">
-                            <i>🌐</i> <a href="{{ partner.website }}" target="_blank">{{ partner.website }}</a>
-                        </p>
-                        {% endif %}
-
-                        <div class="partner-actions">
-                            <a href="/settings/partners/{{ partner.id }}/products" class="btn" style="flex: 1; text-align: center;">
-                                📦 Products ({{ partner.products|length }})
-                            </a>
-                            <button class="btn" style="background: #6c757d;">
-                                ✏️ Edit
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="no-partners">
-                    <h3>🤝 No Partners Yet</h3>
-                    <p>Start building your partner ecosystem by adding your first technology partner.</p>
-                    <a href="/settings/partners/add" class="btn btn-success">+ Add First Partner</a>
-                </div>
-                {% endif %}
-
-                <div style="margin-top: 40px; padding: 20px; background: #e3f2fd; border-radius: 8px;">
-                    <h4>ℹ️ About Partner Management</h4>
-                    <p>Partner management enables AI-powered cross-sell recommendations during proposal generation. The system analyzes project requirements and suggests relevant partner products that complement your solutions.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        ''', partners=partners)
+        return render_template('partners/partner_settings.html', partners=partners)
 
     @app.route('/settings/partners/add', methods=['GET', 'POST'])
     @login_required
     def add_partner():
         """Add new partner"""
-        if request.method == 'POST':
-            try:
-                from models import Partner
+        if request.method == 'GET':
+            return render_template('partners/add_partner.html')
 
-                partner = Partner(
-                    name=request.form['name'],
-                    company_type=request.form['company_type'],
-                    status=request.form['status'],
-                    description=request.form.get('description'),
-                    website=request.form.get('website'),
-                    primary_contact=request.form.get('primary_contact'),
-                    contact_email=request.form.get('contact_email'),
-                    contact_phone=request.form.get('contact_phone'),
-                    revenue_share_percentage=float(request.form.get('revenue_share', 0) or 0),
-                    discount_level=float(request.form.get('discount_level', 0) or 0),
-                    support_level=request.form['support_level']
-                )
+        # POST request - handle partner creation
+        try:
+            from models import Partner
 
-                db.session.add(partner)
-                db.session.commit()
+            partner = Partner(
+                name=request.form['name'],
+                company_type=request.form['company_type'],
+                status=request.form['status'],
+                description=request.form.get('description'),
+                website=request.form.get('website'),
+                primary_contact=request.form.get('primary_contact'),
+                contact_email=request.form.get('contact_email'),
+                contact_phone=request.form.get('contact_phone'),
+                revenue_share_percentage=float(request.form.get('revenue_share', 0) or 0),
+                discount_level=float(request.form.get('discount_level', 0) or 0),
+                support_level=request.form['support_level']
+            )
 
-                flash('Partner added successfully!', 'success')
-                return redirect('/settings/partners')
+            db.session.add(partner)
+            db.session.commit()
 
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Error adding partner: {str(e)}', 'error')
+            flash('Partner added successfully!', 'success')
+            return redirect('/settings/partners')
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Add Partner - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .form-group { margin: 20px 0; }
-                .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                label { display: block; margin-bottom: 5px; font-weight: bold; }
-                input, select, textarea {
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    box-sizing: border-box;
-                }
-                .help-card { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>➕ Add New Partner</h1>
-                        <p style="color: #6c757d;">Add a technology partner to your ecosystem</p>
-                    </div>
-                    <a href="/settings/partners" class="btn">← Back to Partners</a>
-                </div>
-
-                <form method="POST">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="name">Company Name *</label>
-                            <input type="text" id="name" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="company_type">Partner Type *</label>
-                            <select id="company_type" name="company_type" required>
-                                <option value="">Select Type</option>
-                                <option value="STRATEGIC">Strategic Partner</option>
-                                <option value="TECHNOLOGY">Technology Partner</option>
-                                <option value="VENDOR">Vendor</option>
-                                <option value="INTEGRATION">Integration Partner</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="status">Status *</label>
-                            <select id="status" name="status" required>
-                                <option value="ACTIVE">Active</option>
-                                <option value="PREFERRED">Preferred</option>
-                                <option value="INACTIVE">Inactive</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="website">Website</label>
-                            <input type="url" id="website" name="website" placeholder="https://example.com">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea id="description" name="description" rows="3" placeholder="Brief description of the partner company"></textarea>
-                    </div>
-
-                    <h4 style="margin-top: 30px;">Contact Information</h4>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="primary_contact">Primary Contact</label>
-                            <input type="text" id="primary_contact" name="primary_contact">
-                        </div>
-                        <div class="form-group">
-                            <label for="contact_email">Email</label>
-                            <input type="email" id="contact_email" name="contact_email">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="contact_phone">Phone</label>
-                        <input type="tel" id="contact_phone" name="contact_phone">
-                    </div>
-
-                    <h4 style="margin-top: 30px;">Business Terms</h4>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="revenue_share">Revenue Share (%)</label>
-                            <input type="number" id="revenue_share" name="revenue_share" min="0" max="100" step="0.1">
-                        </div>
-                        <div class="form-group">
-                            <label for="discount_level">Discount Level (%)</label>
-                            <input type="number" id="discount_level" name="discount_level" min="0" max="100" step="0.1">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="support_level">Support Level</label>
-                        <select id="support_level" name="support_level">
-                            <option value="BASIC">Basic</option>
-                            <option value="PREMIUM">Premium</option>
-                            <option value="ENTERPRISE">Enterprise</option>
-                        </select>
-                    </div>
-
-                    <div style="display: flex; gap: 10px; margin-top: 30px;">
-                        <a href="/settings/partners" class="btn" style="background: #6c757d;">Cancel</a>
-                        <button type="submit" class="btn btn-success" style="flex: 1;">💾 Add Partner</button>
-                    </div>
-                </form>
-
-                <div class="help-card">
-                    <h4>💡 Partner Types</h4>
-                    <ul>
-                        <li><strong>Strategic:</strong> Long-term partnerships with shared goals</li>
-                        <li><strong>Technology:</strong> Software/hardware solution providers</li>
-                        <li><strong>Vendor:</strong> Service or product suppliers</li>
-                        <li><strong>Integration:</strong> System integration specialists</li>
-                    </ul>
-                </div>
-            </div>
-        </body>
-        </html>
-        ''')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding partner: {str(e)}', 'error')
+            return render_template('partners/add_partner.html')
 
     @app.route('/settings/partners/<int:partner_id>/products')
     @login_required
@@ -981,127 +984,10 @@ def create_app():
         try:
             from models import Partner
             partner = Partner.query.get_or_404(partner_id)
+            return render_template('partners/partner_products.html', partner=partner)
         except Exception as e:
             flash(f"Error loading partner: {e}")
             return redirect('/settings/partners')
-
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>{{ partner.name }} Products - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .partner-info { background: #e3f2fd; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-                .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
-                .product-card {
-                    background: #f8f9fa;
-                    border: 1px solid #e9ecef;
-                    border-radius: 8px;
-                    padding: 20px;
-                    transition: transform 0.2s;
-                }
-                .product-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-                .product-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; }
-                .category-badge { padding: 4px 8px; background: #1f4397; color: white; border-radius: 12px; font-size: 12px; }
-                .complexity-badge { padding: 2px 6px; border-radius: 8px; font-size: 11px; font-weight: bold; }
-                .complexity-low { background: #d4edda; color: #155724; }
-                .complexity-medium { background: #fff3cd; color: #856404; }
-                .complexity-high { background: #f8d7da; color: #721c24; }
-                .product-tags { margin: 10px 0; }
-                .tag { display: inline-block; background: #e9ecef; color: #495057; padding: 2px 8px; margin: 2px; border-radius: 10px; font-size: 12px; }
-                .product-actions { display: flex; gap: 10px; margin-top: 15px; }
-                .no-products { text-align: center; padding: 60px; color: #6c757d; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>📦 {{ partner.name }} Products</h1>
-                        <p style="color: #6c757d;">Manage products and services for {{ partner.name }}</p>
-                    </div>
-                    <div>
-                        <a href="/settings/partners" class="btn">← Back to Partners</a>
-                        <a href="/settings/partners/{{ partner.id }}/products/add" class="btn btn-success">+ Add Product</a>
-                    </div>
-                </div>
-
-                <div class="partner-info">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h4 style="margin: 0;">{{ partner.name }}</h4>
-                            <p style="margin: 5px 0; color: #666;">{{ partner.description or 'No description available' }}</p>
-                        </div>
-                        <div>
-                            <span class="category-badge">{{ partner.company_type }}</span>
-                            <span style="margin-left: 10px; color: #28a745; font-weight: bold;">{{ partner.status }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {% if partner.products %}
-                <div class="product-grid">
-                    {% for product in partner.products %}
-                    <div class="product-card">
-                        <div class="product-header">
-                            <h5 style="margin: 0;">{{ product.product_name }}</h5>
-                            <span class="category-badge">{{ product.category }}</span>
-                        </div>
-
-                        <p style="color: #6c757d; font-size: 14px; margin: 10px 0;">
-                            {{ product.functionality[:120] }}{% if product.functionality|length > 120 %}...{% endif %}
-                        </p>
-
-                        <div style="margin: 15px 0;">
-                            <span class="complexity-badge complexity-{{ product.integration_complexity.lower() }}">
-                                {{ product.integration_complexity }} Integration
-                            </span>
-                            <span style="margin-left: 10px; font-size: 12px; color: #666;">
-                                {% if product.api_available %}✅ API{% else %}❌ No API{% endif %}
-                                {% if product.cloud_native %}| ☁️ Cloud{% endif %}
-                            </span>
-                        </div>
-
-                        {% if product.technical_keywords %}
-                        <div class="product-tags">
-                            {% for keyword in product.technical_keywords[:4] %}
-                            <span class="tag">{{ keyword }}</span>
-                            {% endfor %}
-                            {% if product.technical_keywords|length > 4 %}
-                            <span style="font-size: 12px; color: #666;">+{{ product.technical_keywords|length - 4 }} more</span>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-
-                        <div style="font-size: 12px; color: #666; margin: 10px 0;">
-                            <strong>Implementation:</strong> {{ product.implementation_time or 'TBD' }}
-                            <br><strong>Pricing:</strong> {{ product.pricing_type }}
-                        </div>
-
-                        <div class="product-actions">
-                            <button class="btn" style="flex: 1;">👁️ View Details</button>
-                            <button class="btn" style="background: #6c757d;">✏️ Edit</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="no-products">
-                    <h3>📦 No Products Yet</h3>
-                    <p>Add the first product for {{ partner.name }} to enable AI recommendations.</p>
-                    <a href="/settings/partners/{{ partner.id }}/products/add" class="btn btn-success">+ Add First Product</a>
-                </div>
-                {% endif %}
-            </div>
-        </body>
-        </html>
-        ''', partner=partner)
 
     @app.route('/settings/partners/<int:partner_id>/products/add', methods=['GET', 'POST'])
     @login_required
@@ -1114,658 +1000,201 @@ def create_app():
             flash(f"Error loading partner: {e}")
             return redirect('/settings/partners')
 
-        if request.method == 'POST':
-            try:
-                from models import PartnerProduct
+        if request.method == 'GET':
+            return render_template('partners/add_partner_product.html', partner=partner)
 
-                # Parse JSON fields
-                supported_platforms = [p.strip() for p in request.form.get('supported_platforms', '').split(',') if p.strip()]
-                security_certs = [c.strip() for c in request.form.get('security_certifications', '').split(',') if c.strip()]
-                tech_keywords = [k.strip() for k in request.form.get('technical_keywords', '').split(',') if k.strip()]
-                industry_fit = [i.strip() for i in request.form.get('industry_fit', '').split(',') if i.strip()]
+        # POST request - handle product creation
+        try:
+            from models import PartnerProduct
 
-                product = PartnerProduct(
-                    partner_id=partner_id,
-                    product_name=request.form['product_name'],
-                    category=request.form['category'],
-                    functionality=request.form['functionality'],
-                    integration_complexity=request.form['integration_complexity'],
-                    api_available=bool(request.form.get('api_available')),
-                    cloud_native=bool(request.form.get('cloud_native')),
-                    supported_platforms=supported_platforms,
-                    security_certifications=security_certs,
-                    pricing_type=request.form['pricing_type'],
-                    implementation_time=request.form.get('implementation_time'),
-                    maintenance_required=bool(request.form.get('maintenance_required')),
-                    technical_keywords=tech_keywords,
-                    industry_fit=industry_fit
-                )
+            # Parse JSON fields
+            supported_platforms = [p.strip() for p in request.form.get('supported_platforms', '').split(',') if p.strip()]
+            security_certs = [c.strip() for c in request.form.get('security_certifications', '').split(',') if c.strip()]
+            tech_keywords = [k.strip() for k in request.form.get('technical_keywords', '').split(',') if k.strip()]
+            industry_fit = [i.strip() for i in request.form.get('industry_fit', '').split(',') if i.strip()]
 
-                db.session.add(product)
-                db.session.commit()
+            product = PartnerProduct(
+                partner_id=partner_id,
+                product_name=request.form['product_name'],
+                category=request.form['category'],
+                functionality=request.form['functionality'],
+                integration_complexity=request.form['integration_complexity'],
+                api_available=bool(request.form.get('api_available')),
+                cloud_native=bool(request.form.get('cloud_native')),
+                supported_platforms=supported_platforms,
+                security_certifications=security_certs,
+                pricing_type=request.form['pricing_type'],
+                implementation_time=request.form.get('implementation_time'),
+                maintenance_required=bool(request.form.get('maintenance_required')),
+                technical_keywords=tech_keywords,
+                industry_fit=industry_fit
+            )
 
-                flash('Product added successfully!', 'success')
-                return redirect(f'/settings/partners/{partner_id}/products')
+            db.session.add(product)
+            db.session.commit()
 
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Error adding product: {str(e)}', 'error')
+            flash('Product added successfully!', 'success')
+            return redirect(f'/settings/partners/{partner_id}/products')
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Add Product - {{ partner.name }} - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .form-section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
-                .form-group { margin: 15px 0; }
-                .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
-                label { display: block; margin-bottom: 5px; font-weight: bold; }
-                input, select, textarea {
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    box-sizing: border-box;
-                }
-                .checkbox-group { display: flex; gap: 20px; }
-                .checkbox-item { display: flex; align-items: center; }
-                .checkbox-item input { width: auto; margin-right: 8px; }
-                .help-text { font-size: 12px; color: #6c757d; margin-top: 5px; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>➕ Add Product to {{ partner.name }}</h1>
-                        <p style="color: #6c757d;">Define a new product or service offering</p>
-                    </div>
-                    <a href="/settings/partners/{{ partner.id }}/products" class="btn">← Back to Products</a>
-                </div>
-
-                <form method="POST">
-                    <div class="form-section">
-                        <h4>Basic Information</h4>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="product_name">Product Name *</label>
-                                <input type="text" id="product_name" name="product_name" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="category">Category *</label>
-                                <select id="category" name="category" required>
-                                    <option value="">Select Category</option>
-                                    <option value="AUTHENTICATION">Authentication & Security</option>
-                                    <option value="PAYMENT">Payment Processing</option>
-                                    <option value="ANALYTICS">Analytics & Reporting</option>
-                                    <option value="MESSAGING">Messaging & Communication</option>
-                                    <option value="STORAGE">Data Storage</option>
-                                    <option value="AI_ML">AI & Machine Learning</option>
-                                    <option value="INTEGRATION">Integration & APIs</option>
-                                    <option value="MONITORING">Monitoring & Logging</option>
-                                    <option value="CRM">Customer Relationship Management</option>
-                                    <option value="ERP">Enterprise Resource Planning</option>
-                                    <option value="OTHER">Other</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="pricing_type">Pricing Model</label>
-                                <select id="pricing_type" name="pricing_type">
-                                    <option value="SUBSCRIPTION">Subscription</option>
-                                    <option value="LICENSE">License</option>
-                                    <option value="TRANSACTION">Per Transaction</option>
-                                    <option value="USAGE">Usage-based</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="functionality">Functionality Description *</label>
-                            <textarea id="functionality" name="functionality" rows="3" required placeholder="Describe what this product does and its key capabilities"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h4>Technical Specifications</h4>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="integration_complexity">Integration Complexity</label>
-                                <select id="integration_complexity" name="integration_complexity">
-                                    <option value="LOW">Low - Simple configuration</option>
-                                    <option value="MEDIUM" selected>Medium - Moderate setup</option>
-                                    <option value="HIGH">High - Complex integration</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="implementation_time">Implementation Time</label>
-                                <input type="text" id="implementation_time" name="implementation_time" placeholder="e.g., 2-4 weeks">
-                            </div>
-                            <div class="form-group">
-                                <label>Features</label>
-                                <div class="checkbox-group">
-                                    <div class="checkbox-item">
-                                        <input type="checkbox" id="api_available" name="api_available" checked>
-                                        <label for="api_available">API Available</label>
-                                    </div>
-                                    <div class="checkbox-item">
-                                        <input type="checkbox" id="cloud_native" name="cloud_native" checked>
-                                        <label for="cloud_native">Cloud Native</label>
-                                    </div>
-                                    <div class="checkbox-item">
-                                        <input type="checkbox" id="maintenance_required" name="maintenance_required" checked>
-                                        <label for="maintenance_required">Maintenance Required</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="supported_platforms">Supported Platforms</label>
-                                <input type="text" id="supported_platforms" name="supported_platforms" placeholder="web, mobile, api, desktop">
-                                <div class="help-text">Enter platforms separated by commas</div>
-                            </div>
-                            <div class="form-group">
-                                <label for="security_certifications">Security Certifications</label>
-                                <input type="text" id="security_certifications" name="security_certifications" placeholder="SO
-                               <div class="help-text">Enter certifications separated by commas</div>
-                           </div>
-                       </div>
-                   </div>
-
-                   <div class="form-section">
-                       <h4>AI Matching Configuration</h4>
-
-                       <div class="form-group">
-                           <label for="technical_keywords">Technical Keywords</label>
-                           <input type="text" id="technical_keywords" name="technical_keywords" placeholder="authentication, oauth, sso, security">
-                           <div class="help-text">Keywords that help AI match this product to project requirements</div>
-                       </div>
-
-                       <div class="form-group">
-                           <label for="industry_fit">Industry Fit</label>
-                           <input type="text" id="industry_fit" name="industry_fit" placeholder="healthcare, banking, retail, fintech">
-                           <div class="help-text">Industries where this product is commonly used</div>
-                       </div>
-                   </div>
-
-                   <div style="display: flex; gap: 10px; margin-top: 30px;">
-                       <a href="/settings/partners/{{ partner.id }}/products" class="btn" style="background: #6c757d;">Cancel</a>
-                       <button type="submit" class="btn btn-success" style="flex: 1;">💾 Add Product</button>
-                   </div>
-               </form>
-           </div>
-       </body>
-       </html>
-       ''', partner=partner)
-
-   # Add navigation link to partner management in the main navigation
-   # You'll need to modify your dashboard template to include a link to /settings/partners
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding product: {str(e)}', 'error')
+            return render_template('partners/add_partner_product.html', partner=partner)
 
     # ========================================
-    # DOCUMENT UPLOAD & PROCESSING
+    # ANALYSIS & DOCUMENT VIEWS
     # ========================================
 
-    @app.route('/upload')
-    def upload_page():
-        """Upload page"""
-        if 'username' not in session:
-            return redirect('/login')
+    @app.route('/document/<int:document_id>')
+    @login_required
+    def document_detail(document_id):
+        """Individual document analysis page"""
+        try:
+            from models import User, Document, Project
+            from real_analysis_system import get_real_document_analysis
 
-        project_id = request.args.get('project_id')
+            user = User.query.filter_by(username=session['username']).first()
+            document = Document.query.get_or_404(document_id)
 
+            # Verify user owns this document through project
+            project = Project.query.filter_by(id=document.project_id, user_id=user.id).first()
+            if not project:
+                return redirect('/projects')
+
+            ai_analysis = get_real_document_analysis(document_id)
+
+            doc_analysis = {
+                'filename': document.original_filename or document.filename,
+                'file_size': f"{document.file_size / 1024 / 1024:.1f} MB" if document.file_size else "Unknown",
+                'upload_date': document.uploaded_at.strftime('%Y-%m-%d %H:%M') if document.uploaded_at else 'Unknown',
+                'analysis_confidence': ai_analysis.get('analysis_confidence', 'Unknown') if ai_analysis else 'No analysis available',
+                'extracted_requirements': ai_analysis.get('extracted_requirements', []) if ai_analysis else [],
+                'key_terms': ai_analysis.get('key_terms', []) if ai_analysis else [],
+                'compliance_items': ai_analysis.get('compliance_items', []) if ai_analysis else [],
+            }
+
+            return render_template('document_detail.html',
+                                 document=document,
+                                 project=project,
+                                 doc_analysis=doc_analysis)
+        except Exception as e:
+            flash(f"Error loading document: {e}")
+            return redirect('/projects')
+
+    @app.route('/analysis/<project_id>')
+    @login_required
+    def analysis_view(project_id):
+        """Analysis results page for a project"""
+        try:
+            from models import User, Project, Document
+            from real_analysis_system import get_real_analysis_results
+
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            documents = Document.query.filter_by(project_id=project_id).all()
+            analysis_results = get_real_analysis_results(project_id)
+
+            return render_template('analysis_view.html',
+                                 project=project,
+                                 documents=documents,
+                                 analysis_results=analysis_results)
+        except Exception as e:
+            flash(f"Error loading analysis: {e}")
+            return redirect('/projects')
+
+    # ========================================
+    # PROPOSAL GENERATION
+    # ========================================
+
+    @app.route('/generate-proposal/<project_id>')
+    @login_required
+    def generate_proposal_page(project_id):
+        """Proposal generation page with multiple deliverable options"""
+        try:
+            from models import User, Project, Document
+            from real_analysis_system import get_real_analysis_results
+
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            documents = Document.query.filter_by(project_id=project_id).all()
+
+            # Get analysis results for the project
+            analysis_results = get_real_analysis_results(project_id)
+
+            return render_template('generate_proposal.html',
+                                 project=project,
+                                 documents=documents,
+                                 analysis_results=analysis_results)
+        except Exception as e:
+            flash(f"Error loading project: {e}")
+            return redirect('/projects')
+
+    @app.route('/proposals/<project_id>')
+    @login_required
+    def view_proposals(project_id):
+        """View all generated proposals for a project"""
         try:
             from models import User, Project
             user = User.query.filter_by(username=session['username']).first()
-            user_projects = Project.query.filter_by(user_id=user.id).all()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+
+            return render_template('view_proposals.html', project=project)
         except Exception as e:
-            user_projects = []
+            flash(f'Error loading proposals: {e}')
+            return redirect('/projects')
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Upload Documents - Tender Analysis System</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .upload-area {
-                    border: 2px dashed #ddd;
-                    padding: 40px;
-                    text-align: center;
-                    margin: 20px 0;
-                    border-radius: 8px;
-                    background: #f8f9fa;
-                    transition: border-color 0.3s;
-                }
-                .upload-area:hover { border-color: #667eea; }
-                .upload-area.dragover { border-color: #28a745; background: #d4edda; }
-                select, input[type="file"] { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
-                .progress { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; margin: 10px 0; overflow: hidden; }
-                .progress-bar { height: 100%; background: #28a745; width: 0%; transition: width 0.3s; }
-                .file-list { margin: 20px 0; }
-                .file-item { padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                    <h1>📄 Upload Documents</h1>
-                    <a href="/" class="btn">← Back to Dashboard</a>
-                </div>
+    @app.route('/projects/<project_id>/partner-recommendations')
+    @login_required
+    def view_partner_recommendations(project_id):
+        """View and select partner recommendations for a project"""
+        try:
+            from models import User, Project, Partner, PartnerProduct
+            from real_analysis_system import get_real_analysis_results
 
-                <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3>🤖 AI Document Analysis</h3>
-                    <p>Upload RFP documents, technical specifications, or requirements. Our AI will automatically:</p>
-                    <ul>
-                        <li>Extract key requirements and specifications</li>
-                        <li>Categorize requirements by priority (Must Have, Good to Have)</li>
-                        <li>Identify compliance and technical constraints</li>
-                        <li>Generate proposal recommendations</li>
-                    </ul>
-                </div>
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
 
-                <form id="uploadForm" enctype="multipart/form-data">
-                    <div style="margin: 20px 0;">
-                        <label for="project_id"><strong>Select Project:</strong></label>
-                        <select id="project_id" name="project_id" required>
-                            <option value="">Choose a project...</option>
-                            {% for project in user_projects %}
-                            <option value="{{ project.id }}" {% if project_id == project.id|string %}selected{% endif %}>
-                                {{ project.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        {% if not user_projects %}
-                        <p style="color: #dc3545;">⚠️ No projects found. <a href="/projects">Create a project first</a>.</p>
-                        {% endif %}
-                    </div>
+            # Get analysis results for intelligent matching
+            analysis_results = get_real_analysis_results(project_id)
 
-                    <div class="upload-area" id="uploadArea">
-                        <h3>📁 Drop files here or click to upload</h3>
-                        <p>Supported formats: PDF, DOCX, TXT, XLSX</p>
-                        <p>Maximum file size: 50MB</p>
-                        <input type="file" id="fileInput" name="files" multiple accept=".pdf,.docx,.txt,.xlsx,.doc,.xls" style="display: none;">
-                        <button type="button" onclick="document.getElementById('fileInput').click()" class="btn">Choose Files</button>
-                    </div>
+            # Get all active partner products
+            partner_products = db.session.query(PartnerProduct).join(Partner).filter(
+                Partner.status == 'ACTIVE'
+            ).all()
 
-                    <div id="fileList" class="file-list"></div>
+            # Simple keyword matching for recommendations
+            recommendations = []
+            for product in partner_products:
+                fit_score = calculate_simple_fit_score(analysis_results, product)
+                if fit_score > 30:  # Show products with some relevance
+                    recommendations.append({
+                        'product': product,
+                        'partner': product.partner,
+                        'fit_score': fit_score,
+                        'reasoning': generate_fit_reasoning(analysis_results, product),
+                        'estimated_cost': estimate_product_cost(product),
+                        'integration_scope': determine_integration_scope(fit_score)
+                    })
 
-                    <div id="progress" class="progress" style="display: none;">
-                        <div id="progressBar" class="progress-bar"></div>
-                    </div>
+            # Sort by fit score
+            recommendations.sort(key=lambda x: x['fit_score'], reverse=True)
 
-                    <button type="submit" class="btn" style="width: 100%; padding: 15px; font-size: 16px;" disabled id="uploadBtn">
-                        🚀 Start AI Analysis
-                    </button>
-                </form>
-
-                <div id="results" style="margin-top: 30px;"></div>
-            </div>
-
-            <script>
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-            const fileList = document.getElementById('fileList');
-            const uploadBtn = document.getElementById('uploadBtn');
-            const form = document.getElementById('uploadForm');
-            const progress = document.getElementById('progress');
-            const progressBar = document.getElementById('progressBar');
-
-            let selectedFiles = [];
-
-            // Fix drag and drop functionality
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadArea.classList.add('dragover');
-            });
-
-            uploadArea.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadArea.classList.remove('dragover');
-                handleFiles(e.dataTransfer.files);
-            });
-
-            // Fix click to upload
-            uploadArea.addEventListener('click', (e) => {
-                if (e.target.tagName !== 'BUTTON') {
-                    fileInput.click();
-                }
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
-            });
-
-            function handleFiles(files) {
-                selectedFiles = Array.from(files);
-                updateFileList();
-                updateUploadButton();
-                console.log('Files selected:', selectedFiles.map(f => `${f.name} (${f.size} bytes)`));
-            }
-
-            function updateFileList() {
-                fileList.innerHTML = '';
-                selectedFiles.forEach((file, index) => {
-                    // Fix file size calculation - ensure it's not showing 0.00
-                    const fileSizeMB = file.size > 0 ? (file.size / 1024 / 1024).toFixed(2) : '0.00';
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    fileItem.innerHTML = `
-                        <div>
-                            <strong>${file.name}</strong> (${fileSizeMB} MB)
-                            <br><small style="color: #666;">Type: ${file.type || 'unknown'} | Size: ${file.size} bytes</small>
-                        </div>
-                        <button type="button" onclick="removeFile(${index})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px;">Remove</button>
-                    `;
-                    fileList.appendChild(fileItem);
-                });
-            }
-
-            function removeFile(index) {
-                selectedFiles.splice(index, 1);
-                updateFileList();
-                updateUploadButton();
-            }
-
-            function updateUploadButton() {
-                const projectSelected = document.getElementById('project_id').value;
-                uploadBtn.disabled = !(selectedFiles.length > 0 && projectSelected);
-            }
-
-            document.getElementById('project_id').addEventListener('change', updateUploadButton);
-
-            // Fixed form submission with proper error handling
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                const projectId = document.getElementById('project_id').value;
-                if (!projectId || selectedFiles.length === 0) {
-                    alert('Please select a project and upload at least one file.');
-                    return;
-                }
-
-                progress.style.display = 'block';
-                uploadBtn.disabled = true;
-                uploadBtn.textContent = '🔄 Uploading...';
-
-                const uploadedDocuments = [];
-                let hasErrors = false;
-
-                for (let i = 0; i < selectedFiles.length; i++) {
-                    const file = selectedFiles[i];
-                    console.log(`Uploading file ${i + 1}/${selectedFiles.length}: ${file.name} (${file.size} bytes)`);
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('project_id', projectId);
-
-                    try {
-                        // Add headers to fix potential CORS/HTTP2 issues
-                        const response = await fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData,
-                            // Remove any Content-Type header to let browser set it with boundary
-                            headers: {
-                                'Accept': 'application/json',
-                            },
-                            // Add these options to handle connection issues
-                            credentials: 'same-origin',
-                            cache: 'no-cache'
-                        });
-
-                        console.log(`Response for ${file.name}:`, response.status, response.statusText);
-
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
-
-                        const result = await response.json();
-                        console.log(`Result for ${file.name}:`, result);
-
-                        if (result.success) {
-                            progressBar.style.width = ((i + 1) / selectedFiles.length * 100) + '%';
-                            console.log(`✅ File ${file.name} uploaded successfully`);
-
-                            // Store document info for tracking
-                            uploadedDocuments.push({
-                                documentId: result.document_id,
-                                filename: result.filename,
-                                taskId: result.task_id
-                            });
-                        } else {
-                            console.error(`❌ Error uploading ${file.name}:`, result.error);
-                            alert(`Error uploading ${file.name}: ${result.error}`);
-                            hasErrors = true;
-                        }
-                    } catch (error) {
-                        console.error(`❌ Network error uploading ${file.name}:`, error);
-                        alert(`Network error uploading ${file.name}: ${error.message}`);
-                        hasErrors = true;
-                    }
-                }
-
-                // Continue with tracking if we have successful uploads
-                if (uploadedDocuments.length > 0) {
-                    uploadBtn.textContent = '📄 Extracting Content...';
-                    startTrackingProcessing(uploadedDocuments, projectId);
-                } else {
-                    uploadBtn.textContent = '🚀 Start AI Analysis';
-                    uploadBtn.disabled = false;
-                    progress.style.display = 'none';
-
-                    if (hasErrors) {
-                        alert('All uploads failed. Please check the console for details.');
-                    }
-                }
-            });
-
-            // Enhanced processing tracking with better error handling
-            function startTrackingProcessing(documents, projectId) {
-                console.log('Starting to track processing for documents:', documents);
-
-                const resultsDiv = document.getElementById('results');
-                resultsDiv.innerHTML = `
-                    <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 20px;">
-                        <h3>📄 Processing Documents</h3>
-                        <p>Extracting content from your documents. Once complete, you can view AI analysis results.</p>
-                        <div id="processingStatus"></div>
-                    </div>
-                `;
-
-                const statusDiv = document.getElementById('processingStatus');
-                let completedCount = 0;
-
-                documents.forEach((doc, index) => {
-                    const docStatus = document.createElement('div');
-                    docStatus.id = `doc-status-${doc.documentId}`;
-                    docStatus.style.cssText = 'margin: 10px 0; padding: 10px; background: white; border-radius: 4px;';
-                    docStatus.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><strong>${doc.filename}</strong></span>
-                            <span id="status-${doc.documentId}" style="color: #ffa500;">⏳ Processing...</span>
-                        </div>
-                    `;
-                    statusDiv.appendChild(docStatus);
-                });
-
-                // Check processing status periodically with better error handling
-                const checkStatus = async () => {
-                    console.log('Checking status for documents...');
-
-                    for (const doc of documents) {
-                        try {
-                            const response = await fetch(`/api/document-status/${doc.documentId}`, {
-                                method: 'GET',
-                                headers: {
-                                    'Accept': 'application/json',
-                                },
-                                credentials: 'same-origin',
-                                cache: 'no-cache'
-                            });
-
-                            if (!response.ok) {
-                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                            }
-
-                            const status = await response.json();
-                            console.log(`Status for document ${doc.documentId}:`, status);
-
-                            const statusElement = document.getElementById(`status-${doc.documentId}`);
-                            if (!statusElement) continue;
-
-                            if (status.processing_status === 'completed') {
-                                statusElement.innerHTML = '✅ Content Extracted';
-                                statusElement.style.color = '#28a745';
-                                completedCount++;
-                            } else if (status.processing_status === 'failed') {
-                                statusElement.innerHTML = '❌ Extraction Failed';
-                                statusElement.style.color = '#dc3545';
-                                completedCount++;
-                            } else if (status.processing_status === 'in_progress') {
-                                statusElement.innerHTML = '🔄 Extracting...';
-                                statusElement.style.color = '#17a2b8';
-                            }
-
-                            // Show when content is ready for analysis
-                            if (status.processing_status === 'completed') {
-                                const docStatusDiv = document.getElementById(`doc-status-${doc.documentId}`);
-                                if (docStatusDiv && !docStatusDiv.querySelector('.ready-notice')) {
-                                    const readyNotice = document.createElement('div');
-                                    readyNotice.className = 'ready-notice';
-                                    readyNotice.style.cssText = 'margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; font-size: 14px; color: #155724;';
-                                    readyNotice.innerHTML = `✅ Ready for AI analysis via your RealAnalysisEngine`;
-                                    docStatusDiv.appendChild(readyNotice);
-                                }
-                            }
-                        } catch (error) {
-                            console.error(`Error checking status for ${doc.filename}:`, error);
-                            const statusElement = document.getElementById(`status-${doc.documentId}`);
-                            if (statusElement) {
-                                statusElement.innerHTML = '⚠️ Status Check Failed';
-                                statusElement.style.color = '#ffc107';
-                            }
-                        }
-                    }
-
-                    // Check if all documents are processed
-                    if (completedCount >= documents.length) {
-                        uploadBtn.textContent = '✅ Upload Complete';
-                        uploadBtn.style.background = '#28a745';
-
-                        // Show final success message
-                        resultsDiv.innerHTML += `
-                            <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid #c3e6cb;">
-                                <h4 style="color: #155724;">🎉 Documents Ready for Analysis!</h4>
-                                <p style="color: #155724;">Your documents have been processed and are ready for AI analysis using your RealAnalysisEngine.</p>
-                                <div style="margin-top: 15px;">
-                                    <button onclick="window.location.href='/projects'" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 5px; margin-right: 10px; cursor: pointer;">
-                                        📊 View Project Dashboard
-                                    </button>
-                                    <button onclick="window.location.href='/analysis/${projectId}'" style="background: #1f4397; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer;">
-                                        🤖 Run AI Analysis
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-
-                    } else {
-                        // Continue checking every 3 seconds
-                        setTimeout(checkStatus, 3000);
-                    }
-                };
-
-                // Start checking after 2 seconds
-                setTimeout(checkStatus, 2000);
-            }
-
-            // Add this function to view individual document details
-            function viewDocumentDetails(documentId) {
-                window.location.href = `/document/${documentId}`;
-            }
-
-            // Add some debugging info
-            console.log('Upload page JavaScript loaded');
-            console.log('Browser info:', {
-                userAgent: navigator.userAgent,
-                onLine: navigator.onLine,
-                cookieEnabled: navigator.cookieEnabled
-            });
-            </script>
-        </body>
-        </html>
-        ''', user_projects=user_projects, project_id=project_id)
+            return render_template('partner_recommendations.html',
+                                 project=project,
+                                 analysis_results=analysis_results,
+                                 recommendations=recommendations)
+        except Exception as e:
+            flash(f"Error loading recommendations: {e}")
+            return redirect('/projects')
 
     # ========================================
     # API ENDPOINTS
     # ========================================
 
-    # Add a new route to check task status
-    @app.route('/api/task-status/<task_id>')
-    def get_task_status(task_id):
-        """Get status of a background task"""
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
-        try:
-            if celery:
-                from celery.result import AsyncResult
-                task = AsyncResult(task_id, app=celery)
-
-                if task.state == 'PENDING':
-                    response = {
-                        'state': task.state,
-                        'status': 'Task is waiting to be processed'
-                    }
-                elif task.state == 'PROGRESS':
-                    response = {
-                        'state': task.state,
-                        'status': task.info.get('status', 'Processing...'),
-                        'progress': task.info.get('progress', 0)
-                    }
-                elif task.state == 'SUCCESS':
-                    response = {
-                        'state': task.state,
-                        'result': task.result
-                    }
-                else:  # FAILURE
-                    response = {
-                        'state': task.state,
-                        'error': str(task.info)
-                    }
-                return jsonify(response)
-            else:
-                return jsonify({'error': 'Celery not available'}), 503
-
-        except Exception as e:
-            return jsonify({'error': f'Failed to get task status: {str(e)}'}), 500
-
-
     @app.route('/api/projects', methods=['POST'])
-    def create_project():
+    @login_required
+    def create_project_api():
         """Create new project API"""
-        if 'username' not in session:
-            return jsonify({'success': False, 'error': 'Not logged in'}), 401
-
         try:
             data = request.get_json()
 
@@ -1775,11 +1204,18 @@ def create_app():
                 return jsonify({'success': False, 'error': 'User not found'}), 404
 
             project = Project(
+                id=str(uuid.uuid4()),  # Generate UUID if your model uses string IDs
                 name=data.get('name'),
                 description=data.get('description', ''),
                 status='active',
                 user_id=user.id
             )
+            """project = Project(
+                name=data.get('name'),
+                description=data.get('description', ''),
+                status='active',
+                user_id=user.id
+            )"""
 
             db.session.add(project)
             db.session.commit()
@@ -1793,34 +1229,10 @@ def create_app():
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/upload-test', methods=['GET', 'POST'])
-    def test_upload():
-        """Test upload functionality"""
-        if request.method == 'GET':
-            return jsonify({
-                'status': 'Upload test endpoint ready',
-                'max_content_length': app.config.get('MAX_CONTENT_LENGTH'),
-                'upload_folder': app.config.get('UPLOAD_FOLDER'),
-                'upload_folder_exists': os.path.exists(app.config.get('UPLOAD_FOLDER', '')),
-                'allowed_extensions': list(ALLOWED_EXTENSIONS),
-                'session_active': 'username' in session,
-                'username': session.get('username', 'Not logged in')
-            })
-
-        if request.method == 'POST':
-            return jsonify({
-                'files_received': list(request.files.keys()),
-                'form_data': dict(request.form),
-                'content_length': request.content_length,
-                'session_user': session.get('username', 'Not logged in')
-            })
-
     @app.route('/api/upload', methods=['POST'])
+    @login_required
     def upload_file():
         """Handle file upload API - Enhanced with better error handling"""
-        if 'username' not in session:
-            return jsonify({'success': False, 'error': 'Not logged in'}), 401
-
         try:
             print(f"📤 Upload request received from user: {session['username']}")
             print(f"📋 Request files: {list(request.files.keys())}")
@@ -1900,23 +1312,50 @@ def create_app():
             if saved_size != file_size:
                 print(f"⚠️ Size mismatch: uploaded={file_size}, saved={saved_size}")
 
+            # Extract text content immediately
+            extracted_content = ""
+            extraction_error = None
+            
+            print(f"🔍 Extracting text from {original_filename}...")
+            try:
+                document_processor = app.config.get('DOCUMENT_PROCESSOR')
+                if document_processor:
+                    # Use the built-in extraction method with mime type
+                    extracted_content = document_processor.extract_text_from_file(file_path, file.content_type)
+                    
+                    if extracted_content and extracted_content.strip():
+                        print(f"✅ Extracted {len(extracted_content)} characters from {original_filename}")
+                    else:
+                        print(f"⚠️ No content extracted from {original_filename}")
+                        extraction_error = "No text content found in document"
+                else:
+                    print("⚠️ Document processor not available")
+                    extraction_error = "Document processor not configured"
+                    
+            except Exception as e:
+                print(f"❌ Text extraction error: {e}")
+                extraction_error = f"Text extraction failed: {str(e)}"
+
             # Create document record
             try:
                 document = Document(
                     filename=unique_filename,
                     original_filename=original_filename,
                     file_path=file_path,
-                    file_size=saved_size,  # Use actual saved size
+                    file_size=saved_size,
                     project_id=project_id,
                     uploaded_by=user.id,
-                    uploaded_at=datetime.utcnow()
+                    uploaded_at=datetime.utcnow(),
+                    extracted_content=extracted_content  # Store extracted content immediately
                 )
 
                 # Add processing status and other fields if they exist in your model
                 if hasattr(document, 'processing_status'):
-                    document.processing_status = 'pending'
+                    document.processing_status = 'processed' if extracted_content else 'failed'
                 if hasattr(document, 'created_at'):
                     document.created_at = datetime.utcnow()
+                if hasattr(document, 'error_message') and extraction_error:
+                    document.error_message = extraction_error
 
                 db.session.add(document)
                 db.session.commit()
@@ -1932,18 +1371,14 @@ def create_app():
                     pass
                 return jsonify({'success': False, 'error': f'Database error: {str(e)}'}), 500
 
-            # Start background processing if Celery is available
+            # Start background processing if available
             task_id = None
             try:
                 if celery:
-                    # Import the task function directly
                     from tasks import process_document_task
-
-                    # Start the task
                     task = process_document_task.delay(document.id)
                     task_id = task.id
 
-                    # Store task ID if the column exists
                     if hasattr(document, 'task_id'):
                         document.task_id = task_id
                         db.session.commit()
@@ -1952,7 +1387,6 @@ def create_app():
 
             except Exception as e:
                 print(f"⚠️ Background task failed to start: {e}")
-                # Update document status if task couldn't start
                 if hasattr(document, 'processing_status'):
                     document.processing_status = 'failed'
                 if hasattr(document, 'error_message'):
@@ -1965,7 +1399,10 @@ def create_app():
                 'filename': original_filename,
                 'file_size': saved_size,
                 'task_id': task_id,
-                'message': 'File uploaded successfully and AI analysis started!' if task_id else 'File uploaded successfully'
+                'extracted_content_length': len(extracted_content) if extracted_content else 0,
+                'extraction_success': bool(extracted_content and extracted_content.strip()),
+                'extraction_error': extraction_error,
+                'message': f'File uploaded and {len(extracted_content)} characters extracted!' if extracted_content else f'File uploaded but content extraction failed: {extraction_error}'
             }
 
             print(f"✅ Upload successful: {response_data}")
@@ -1978,11 +1415,9 @@ def create_app():
             return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
 
     @app.route('/api/document-status/<int:document_id>')
+    @login_required
     def get_document_status(document_id):
-        """Get document processing status - Compatible with RealAnalysisEngine"""
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
-
+        """Get document processing status"""
         try:
             from models import User, Document, Project
             user = User.query.filter_by(username=session['username']).first()
@@ -2006,15 +1441,6 @@ def create_app():
                 except Exception as e:
                     print(f"⚠️ Could not get task status: {e}")
 
-            # Check if we have real analysis available using your RealAnalysisEngine
-            analysis_preview = None
-            try:
-                real_analysis = get_real_document_analysis(document_id)
-                if real_analysis and real_analysis.get('extracted_requirements'):
-                    analysis_preview = f"Found {len(real_analysis['extracted_requirements'])} requirements"
-            except Exception as e:
-                print(f"⚠️ Could not get real analysis preview: {e}")
-
             return jsonify({
                 'document_id': document.id,
                 'filename': getattr(document, 'original_filename', None) or document.filename,
@@ -2022,697 +1448,24 @@ def create_app():
                 'error_message': getattr(document, 'error_message', None),
                 'processed_at': getattr(document, 'processed_at', None),
                 'upload_date': getattr(document, 'uploaded_at', None),
-                'analysis_preview': analysis_preview,
-                'task_status': task_status,
-                'has_real_analysis': analysis_preview is not None
+                'task_status': task_status
             })
 
         except Exception as e:
             print(f"❌ Status check error: {e}")
             return jsonify({'error': f'Status check failed: {str(e)}'}), 500
 
-    # ========================================
-    # ANALYSIS & DOCUMENT VIEWS
-    # ========================================
-
-    @app.route('/document/<int:document_id>')
-    def document_detail(document_id):
-        """Individual document analysis page"""
-        if 'username' not in session:
-            return redirect('/login')
-
-        try:
-            from models import User, Document, Project
-            user = User.query.filter_by(username=session['username']).first()
-            document = Document.query.get_or_404(document_id)
-
-            # Verify user owns this document through project
-            project = Project.query.filter_by(id=document.project_id, user_id=user.id).first()
-            if not project:
-                return redirect('/projects')
-
-            ai_analysis = get_real_document_analysis(document_id)
-
-            doc_analysis = {
-                'filename': document.original_filename or document.filename,
-                'file_size': f"{document.file_size / 1024 / 1024:.1f} MB" if document.file_size else "Unknown",
-                'upload_date': document.uploaded_at.strftime('%Y-%m-%d %H:%M') if document.uploaded_at else 'Unknown',
-                'analysis_confidence': ai_analysis.get('analysis_confidence', 'Unknown') if ai_analysis else 'No analysis available',
-                # Use real AI results
-                'extracted_requirements': ai_analysis.get('extracted_requirements', []) if ai_analysis else [],
-                'key_terms': ai_analysis.get('key_terms', []) if ai_analysis else [],
-                'compliance_items': ai_analysis.get('compliance_items', []) if ai_analysis else [],
-            }
-
-        except Exception as e:
-            flash(f"Error loading document: {e}")
-            return redirect('/projects')
-
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Document Analysis - {{ doc_analysis.filename }}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
-                .btn:hover { background: #5a6fd8; }
-                .info-card { background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #667eea; }
-                .requirement { background: white; padding: 10px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #28a745; }
-                .term-tag {
-                    display: inline-block;
-                    background: #e3f2fd;
-                    color: #1976d2;
-                    padding: 4px 8px;
-                    margin: 2px;
-                    border-radius: 12px;
-                    font-size: 12px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>📄 Document Analysis</h1>
-                        <p style="color: #6c757d;">{{ doc_analysis.filename }}</p>
-                    </div>
-                    <div>
-                        <a href="/project/{{ project.id }}" class="btn">← Back to Project</a>
-                    </div>
-                </div>
-
-                <div class="info-card">
-                    <h3>📊 Document Information</h3>
-                    <p><strong>File Size:</strong> {{ doc_analysis.file_size }}</p>
-                    <p><strong>Upload Date:</strong> {{ doc_analysis.upload_date }}</p>
-                    <p><strong>Analysis Confidence:</strong> {{ doc_analysis.analysis_confidence }}</p>
-                    <p><strong>Project:</strong> {{ project.name }}</p>
-                </div>
-
-                <div class="info-card">
-                    <h3>🎯 Extracted Requirements</h3>
-                    {% for req in doc_analysis.extracted_requirements %}
-                    <div class="requirement">{{ req }}</div>
-                    {% endfor %}
-                </div>
-
-                <div class="info-card">
-                    <h3>🔍 Key Terms Identified</h3>
-                    {% for term in doc_analysis.key_terms %}
-                    <span class="term-tag">{{ term }}</span>
-                    {% endfor %}
-                </div>
-
-                <div class="info-card">
-                    <h3>✅ Compliance Items</h3>
-                    {% for item in doc_analysis.compliance_items %}
-                    <div class="requirement">{{ item }}</div>
-                    {% endfor %}
-                </div>
-
-                <div style="text-align: center; margin-top: 30px;">
-                    <a href="/analysis/{{ project.id }}" class="btn" style="background: #28a745;">
-                        📊 View Full Project Analysis
-                    </a>
-                </div>
-            </div>
-        </body>
-        </html>
-        ''', document=document, project=project, doc_analysis=doc_analysis)
-
-    @app.route('/analysis/<project_id>')
-    def analysis_view(project_id):
-        """Analysis results page for a project"""
-        if 'username' not in session:
-            return redirect('/login')
-
-        try:
-            from models import User, Project, Document
-            user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
-            documents = Document.query.filter_by(project_id=project_id).all()
-            analysis_results = get_real_analysis_results(project_id)
-
-        except Exception as e:
-            flash(f"Error loading analysis: {e}")
-            return redirect('/projects')
-
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>AI Analysis - {{ project.name }}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
-                .btn:hover { background: #5a6fd8; }
-                .analysis-section {
-                    background: #f8f9fa;
-                    padding: 20px;
-                    margin: 20px 0;
-                    border-radius: 8px;
-                    border-left: 4px solid #667eea;
-                }
-                .requirement-item {
-                    background: white;
-                    padding: 10px;
-                    margin: 8px 0;
-                    border-radius: 4px;
-                    border-left: 3px solid #28a745;
-                }
-                .good-to-have { border-left-color: #ffc107; }
-                .must-have { border-left-color: #dc3545; }
-                .tech-spec { border-left-color: #17a2b8; }
-                .summary-card {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    margin-bottom: 30px;
-                }
-                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-                .stat { text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px; margin: 10px; }
-                .stat-number { font-size: 2em; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>🤖 AI Analysis Results</h1>
-                        <p style="color: #6c757d;">Project: {{ project.name }}</p>
-                    </div>
-                    <div>
-                        <a href="/project/{{ project.id }}" class="btn">← Back to Project</a>
-                        <a href="/projects" class="btn">📁 All Projects</a>
-                    </div>
-                </div>
-
-                <div class="summary-card">
-                    <h2>📊 Analysis Summary</h2>
-                    <p>Comprehensive AI analysis of {{ documents|length }} document(s) in this project</p>
-                    <div style="display: flex; justify-content: space-around; margin-top: 20px;">
-                        <div class="stat">
-                            <div class="stat-number">{{ analysis_results.must_have_requirements|length }}</div>
-                            <div>Must Have Requirements</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{{ analysis_results.good_to_have_requirements|length }}</div>
-                            <div>Good to Have Requirements</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{{ analysis_results.technical_specifications|length }}</div>
-                            <div>Technical Specifications</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number">{{ documents|length }}</div>
-                            <div>Documents Analyzed</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid">
-                    <div>
-                        <div class="analysis-section">
-                            <h3>🔴 Must Have Requirements</h3>
-                            <p><strong>Critical requirements that must be met:</strong></p>
-                            {% for req in analysis_results.must_have_requirements %}
-                            <div class="requirement-item must-have">
-                                <strong>•</strong> {{ req }}
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        <div class="analysis-section">
-                            <h3>🟡 Good to Have Requirements</h3>
-                            <p><strong>Preferred features that add value:</strong></p>
-                            {% for req in analysis_results.good_to_have_requirements %}
-                            <div class="requirement-item good-to-have">
-                                <strong>•</strong> {{ req }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="analysis-section">
-                            <h3>⚙️ Technical Specifications</h3>
-                            <p><strong>Key technical requirements and constraints:</strong></p>
-                            {% for spec in analysis_results.technical_specifications %}
-                            <div class="requirement-item tech-spec">
-                                <strong>•</strong> {{ spec }}
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        <div class="analysis-section">
-                            <h3>📋 Project Details</h3>
-                            <div class="requirement-item">
-                                <strong>Timeline:</strong> {{ analysis_results.project_details.timeline }}
-                            </div>
-                            <div class="requirement-item">
-                                <strong>Budget:</strong> {{ analysis_results.project_details.budget }}
-                            </div>
-                            <div class="requirement-item">
-                                <strong>Evaluation:</strong> {{ analysis_results.project_details.evaluation_criteria }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                 <div style="text-align: center; margin-top: 30px;">
-                 <a href="/projects/{{ project.id }}/partner-recommendations" class="btn" style="background: #1f4397; padding: 15px 30px; font-size: 16px; margin-right: 10px;">
-                    🤝 Select Partner Products
-                </a>
-                <a href="/generate-proposal/{{ project.id }}" class="btn" style="background: #28a745; padding: 15px 30px; font-size: 16px;">
-                    📝 Generate Proposal Document
-                </a>
-            </div>
-        </div>
-
-        <script>
-        // Check if proposals exist for this project and show appropriate buttons
-        async function checkProposals() {
-            try {
-                const projectId = {{ project.id }};
-                const response = await fetch(`/api/check-proposals/${projectId}`);
-                const data = await response.json();
-
-                // Find the proposal generation button area
-                const buttonArea = document.querySelector('div[style*="text-align: center"]');
-
-                if (data.has_proposals && data.count > 0) {
-                    // Add view proposals button if proposals exist
-                    buttonArea.innerHTML = `
-                        <a href="/proposals/${projectId}" class="btn" style="background: #17a2b8; margin-right: 10px;">
-                            📄 View Generated Proposals (${data.count})
-                        </a>
-                        <a href="/generate-proposal/${projectId}" class="btn" style="background: #28a745;">
-                            📝 Generate More Documents
-                        </a>
-                    `;
-                } else {
-                    // Keep original generate button if no proposals exist
-                    buttonArea.innerHTML = `
-                        <a href="/generate-proposal/${projectId}" class="btn" style="background: #28a745; padding: 15px 30px; font-size: 16px;">
-                            📝 Generate Proposal Document
-                        </a>
-                    `;
-                }
-
-            } catch (error) {
-                console.log('Could not check proposals:', error);
-                // Keep original button if check fails
-            }
-        }
-
-        // Run check when page loads
-        document.addEventListener('DOMContentLoaded', checkProposals);
-        </script>
-    </body>
-    </html>
-        ''', project=project, documents=documents, analysis_results=analysis_results)
-
-
-    # Add these routes to your main.py file
-
-    @app.route('/generate-proposal/<project_id>')
-    def generate_proposal_page(project_id):
-        """Proposal generation page with multiple deliverable options"""
-        if 'username' not in session:
-            return redirect('/login')
-
-        try:
-            from models import User, Project, Document
-            user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
-            documents = Document.query.filter_by(project_id=project_id).all()
-
-            # Get analysis results for the project
-            analysis_results = get_real_analysis_results(project_id)
-
-        except Exception as e:
-            flash(f"Error loading project: {e}")
-            return redirect('/projects')
-
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Generate Proposal - {{ project.name }}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .btn-primary { background: #1f4397; } .btn-primary:hover { background: #0056b3; }
-                .btn-warning { background: #ffc107; color: #212529; } .btn-warning:hover { background: #e0a800; }
-                .deliverable-card {
-                    background: #f8f9fa;
-                    border: 1px solid #e9ecef;
-                    border-radius: 8px;
-                    padding: 20px;
-                    margin: 15px 0;
-                    transition: all 0.3s;
-                }
-                .deliverable-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-                .deliverable-card.selected { border-color: #1f4397; background: #e3f2fd; }
-                .deliverable-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
-                .checkbox-container { display: flex; align-items: center; margin-bottom: 15px; }
-                .checkbox-container input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
-                .progress-section { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
-                .progress-bar { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; }
-                .progress-fill { height: 100%; background: #1f4397; width: 0%; transition: width 0.5s; }
-                .download-section { background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>📝 Generate Proposal Documents</h1>
-                        <p style="color: #6c757d;">Project: {{ project.name }}</p>
-                    </div>
-                    <div>
-                        <a href="/analysis/{{ project.id }}" class="btn">← Back to Analysis</a>
-                    </div>
-                </div>
-
-                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-                    <h4>📊 Analysis Summary</h4>
-                    <p>Based on analysis of {{ documents|length }} document(s), we can generate the following deliverables:</p>
-                    <ul>
-                        <li><strong>{{ analysis_results.must_have_requirements|length }}</strong> must-have requirements identified</li>
-                        <li><strong>{{ analysis_results.good_to_have_requirements|length }}</strong> good-to-have requirements found</li>
-                        <li><strong>{{ analysis_results.technical_specifications|length }}</strong> technical specifications extracted</li>
-                    </ul>
-                </div>
-
-                <form id="proposalForm">
-                    <h3>📋 Select Deliverables to Generate</h3>
-
-                    <div class="deliverable-grid">
-                        <!-- Technical Proposal -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('technical')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="technical" name="deliverables" value="technical" checked>
-                                <h4>📄 Technical Proposal</h4>
-                            </div>
-                            <p><strong>Comprehensive technical response covering:</strong></p>
-                            <ul>
-                                <li>Executive Summary</li>
-                                <li>Solution Architecture & Technology Stack</li>
-                                <li>Implementation Methodology</li>
-                                <li>Technical Specifications Compliance</li>
-                                <li>System Integration Approach</li>
-                                <li>Performance & Scalability</li>
-                                <li>Security Framework</li>
-                            </ul>
-                            <p><em>~15-25 pages | Professional format</em></p>
-                        </div>
-
-                        <!-- Commercial Proposal -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('commercial')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="commercial" name="deliverables" value="commercial" checked>
-                                <h4>💰 Commercial Proposal</h4>
-                            </div>
-                            <p><strong>Detailed commercial response including:</strong></p>
-                            <ul>
-                                <li>Cost Breakdown Structure</li>
-                                <li>Pricing Model & Payment Terms</li>
-                                <li>Resource Allocation & Team Structure</li>
-                                <li>Project Timeline & Milestones</li>
-                                <li>Return on Investment Analysis</li>
-                                <li>Risk Assessment & Mitigation</li>
-                                <li>Commercial Terms & Conditions</li>
-                            </ul>
-                            <p><em>~10-15 pages | Business focused</em></p>
-                        </div>
-
-                        <!-- Implementation Plan -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('implementation')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="implementation" name="deliverables" value="implementation">
-                                <h4>🚀 Implementation Plan</h4>
-                            </div>
-                            <p><strong>Detailed project execution plan:</strong></p>
-                            <ul>
-                                <li>Work Breakdown Structure (WBS)</li>
-                                <li>Project Timeline with Gantt Chart</li>
-                                <li>Resource Planning & Allocation</li>
-                                <li>Risk Management Strategy</li>
-                                <li>Quality Assurance Framework</li>
-                                <li>Change Management Process</li>
-                                <li>Communication Plan</li>
-                            </ul>
-                            <p><em>~8-12 pages | Project management focus</em></p>
-                        </div>
-
-                        <!-- Technical Architecture -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('architecture')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="architecture" name="deliverables" value="architecture">
-                                <h4>🏗️ Technical Architecture Document</h4>
-                            </div>
-                            <p><strong>Deep technical architecture design:</strong></p>
-                            <ul>
-                                <li>System Architecture Diagrams</li>
-                                <li>Technology Stack Justification</li>
-                                <li>Data Flow & Integration Patterns</li>
-                                <li>Security Architecture</li>
-                                <li>Scalability & Performance Design</li>
-                                <li>Infrastructure Requirements</li>
-                                <li>API Design & Documentation</li>
-                            </ul>
-                            <p><em>~12-18 pages | Technical deep dive</em></p>
-                        </div>
-
-                        <!-- Company Profile -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('company')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="company" name="deliverables" value="company">
-                                <h4>🏢 Company Profile & Credentials</h4>
-                            </div>
-                            <p><strong>Professional company presentation:</strong></p>
-                            <ul>
-                                <li>Company Overview & History</li>
-                                <li>Core Competencies & Services</li>
-                                <li>Relevant Project Case Studies</li>
-                                <li>Team Profiles & Certifications</li>
-                                <li>Client Testimonials</li>
-                                <li>Awards & Recognition</li>
-                                <li>Financial Stability & References</li>
-                            </ul>
-                            <p><em>~6-10 pages | Company credentials</em></p>
-                        </div>
-
-                        <!-- Compliance Matrix -->
-                        <div class="deliverable-card" onclick="toggleDeliverable('compliance')">
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="compliance" name="deliverables" value="compliance">
-                                <h4>✅ Compliance & Requirements Matrix</h4>
-                            </div>
-                            <p><strong>Detailed compliance documentation:</strong></p>
-                            <ul>
-                                <li>Requirements Traceability Matrix</li>
-                                <li>Compliance Checklist</li>
-                                <li>Regulatory Requirements Coverage</li>
-                                <li>Standards & Certifications</li>
-                                <li>Gap Analysis (if any)</li>
-                                <li>Remediation Plans</li>
-                                <li>Testing & Validation Approach</li>
-                            </ul>
-                            <p><em>~5-8 pages | Compliance focused</em></p>
-                        </div>
-                    </div>
-
-                    <div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
-                        <h4>⚙️ Generation Options</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <label><strong>Output Format:</strong></label><br>
-                                <select id="outputFormat" style="width: 100%; padding: 8px; margin-top: 5px;">
-                                    <option value="pdf">PDF Document</option>
-                                    <option value="docx">Word Document (.docx)</option>
-                                    <option value="html">HTML Report</option>
-                                    <option value="markdown">Markdown Format</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label><strong>Detail Level:</strong></label><br>
-                                <select id="detailLevel" style="width: 100%; padding: 8px; margin-top: 5px;">
-                                    <option value="comprehensive">Comprehensive (Detailed)</option>
-                                    <option value="standard" selected>Standard (Balanced)</option>
-                                    <option value="executive">Executive (Summary)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="margin-top: 15px;">
-                            <label><strong>Company Information:</strong></label><br>
-                            <input type="text" id="companyName" placeholder="Your company name" style="width: 48%; padding: 8px; margin: 5px 1% 5px 0;">
-                            <input type="text" id="contactPerson" placeholder="Contact person" style="width: 48%; padding: 8px; margin: 5px 0 5px 1%;">
-                        </div>
-                    </div>
-
-                    <div style="text-align: center; margin: 30px 0;">
-                        <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
-                            🚀 Generate Selected Documents
-                        </button>
-                    </div>
-                </form>
-
-                <div id="progressSection" class="progress-section">
-                    <h4>🔄 Generating Documents...</h4>
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                    <p id="progressText">Starting generation process...</p>
-                </div>
-
-                <div id="downloadSection" class="download-section">
-                    <h4>✅ Documents Generated Successfully!</h4>
-                    <p>Your proposal documents are ready for download:</p>
-                    <div id="downloadLinks"></div>
-                </div>
-            </div>
-
-            <script>
-            function toggleDeliverable(id) {
-                const checkbox = document.getElementById(id);
-                const card = checkbox.closest('.deliverable-card');
-
-                checkbox.checked = !checkbox.checked;
-
-                if (checkbox.checked) {
-                    card.classList.add('selected');
-                } else {
-                    card.classList.remove('selected');
-                }
-            }
-
-            // Initialize selected cards
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
-                    checkbox.closest('.deliverable-card').classList.add('selected');
-                });
-            });
-
-            document.getElementById('proposalForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-
-                const selectedDeliverables = Array.from(document.querySelectorAll('input[name="deliverables"]:checked'))
-                    .map(cb => cb.value);
-
-                if (selectedDeliverables.length === 0) {
-                    alert('Please select at least one deliverable to generate.');
-                    return;
-                }
-
-                const formData = {
-                    deliverables: selectedDeliverables,
-                    output_format: document.getElementById('outputFormat').value,
-                    detail_level: document.getElementById('detailLevel').value,
-                    company_name: document.getElementById('companyName').value || 'Your Company',
-                    contact_person: document.getElementById('contactPerson').value || 'Project Manager'
-                };
-
-                console.log('Generating documents with options:', formData);
-
-                // Show progress
-                document.getElementById('progressSection').style.display = 'block';
-                this.style.display = 'none';
-
-                try {
-                    const response = await fetch('/api/generate-proposal/{{ project.id }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(formData)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        showDownloadSection(result.documents);
-                    } else {
-                        throw new Error(result.error || 'Generation failed');
-                    }
-
-                } catch (error) {
-                    alert('Error generating documents: ' + error.message);
-                    console.error('Generation error:', error);
-
-                    // Reset form
-                    document.getElementById('progressSection').style.display = 'none';
-                    this.style.display = 'block';
-                }
-            });
-
-            function showDownloadSection(documents) {
-                document.getElementById('progressSection').style.display = 'none';
-
-                const downloadSection = document.getElementById('downloadSection');
-                const downloadLinks = document.getElementById('downloadLinks');
-
-                downloadLinks.innerHTML = documents.map(doc => `
-                    <div style="margin: 10px 0; padding: 15px; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>${doc.title}</strong><br>
-                            <small style="color: #666;">${doc.description} | ${doc.format.toUpperCase()} | ${doc.size}</small>
-                        </div>
-                        <a href="${doc.download_url}" class="btn btn-primary" download="${doc.filename}">
-                            📥 Download
-                        </a>
-                    </div>
-                `).join('');
-
-                downloadSection.style.display = 'block';
-            }
-
-            // Simulate progress updates
-            function updateProgress(documents) {
-                const progressFill = document.getElementById('progressFill');
-                const progressText = document.getElementById('progressText');
-
-                let progress = 0;
-                const increment = 100 / documents.length;
-
-                documents.forEach((doc, index) => {
-                    setTimeout(() => {
-                        progress += increment;
-                        progressFill.style.width = progress + '%';
-                        progressText.textContent = `Generating ${doc}... (${Math.round(progress)}%)`;
-                    }, (index + 1) * 2000);
-                });
-            }
-            </script>
-        </body>
-        </html>
-        ''', project=project, documents=documents, analysis_results=analysis_results)
-
     @app.route('/api/generate-proposal/<project_id>', methods=['POST'])
+    @login_required
     def api_generate_proposal(project_id):
-        """API endpoint to generate proposal documents"""
-        if 'username' not in session:
-            return jsonify({'success': False, 'error': 'Not logged in'}), 401
-
+        """API endpoint to generate proposal documents with individual/batch modes"""
         try:
-            from models import User, Project
+            from models import User, Project, CustomDeliverable
+            from real_analysis_system import get_real_analysis_results
+            from proposal_generator import ProposalGenerator
+            import zipfile
+            import tempfile
+            
             user = User.query.filter_by(username=session['username']).first()
             project = Project.query.filter_by(id=project_id, user_id=user.id).first()
 
@@ -2725,16 +1478,14 @@ def create_app():
             detail_level = data.get('detail_level', 'standard')
             company_name = data.get('company_name', 'Your Company')
             contact_person = data.get('contact_person', 'Project Manager')
+            generation_mode = request.args.get('mode', 'standard')
 
             print(f"📝 Generating proposal for project {project_id}")
             print(f"📋 Deliverables: {deliverables}")
-            print(f"📄 Format: {output_format}, Level: {detail_level}")
+            print(f"📄 Format: {output_format}, Level: {detail_level}, Mode: {generation_mode}")
 
             # Get analysis results
             analysis_results = get_real_analysis_results(project_id)
-
-            # Import the proposal generator
-            from proposal_generator import ProposalGenerator
 
             generator = ProposalGenerator(
                 project=project,
@@ -2743,10 +1494,24 @@ def create_app():
                 contact_person=contact_person
             )
 
+            # Separate standard and custom deliverables
+            standard_deliverables = []
+            custom_deliverables = []
+            
+            for deliverable in deliverables:
+                if deliverable.startswith('custom_'):
+                    custom_id = deliverable.replace('custom_', '')
+                    custom_del = CustomDeliverable.query.filter_by(id=custom_id, user_id=user.id).first()
+                    if custom_del:
+                        custom_deliverables.append(custom_del)
+                else:
+                    standard_deliverables.append(deliverable)
+
             # Generate documents
             generated_docs = []
 
-            for deliverable in deliverables:
+            # Generate standard deliverables
+            for deliverable in standard_deliverables:
                 try:
                     doc_result = generator.generate_document(
                         deliverable_type=deliverable,
@@ -2760,16 +1525,61 @@ def create_app():
                     print(f"❌ Failed to generate {deliverable}: {e}")
                     continue
 
+            # Generate custom deliverables
+            for custom_del in custom_deliverables:
+                try:
+                    doc_result = generator.generate_custom_document(
+                        custom_deliverable=custom_del,
+                        output_format=output_format,
+                        detail_level=detail_level
+                    )
+                    generated_docs.append(doc_result)
+                    print(f"✅ Generated custom document: {custom_del.title}")
+
+                except Exception as e:
+                    print(f"❌ Failed to generate custom document {custom_del.title}: {e}")
+                    continue
+
             if not generated_docs:
                 return jsonify({
                     'success': False,
                     'error': 'No documents were generated successfully'
                 }), 500
 
+            # Handle batch mode - create ZIP file
+            if generation_mode == 'batch' and len(generated_docs) > 1:
+                try:
+                    zip_filename = f"proposal_package_{project.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                    zip_path = os.path.join('generated_proposals', zip_filename)
+                    
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        for doc in generated_docs:
+                            if 'filepath' in doc and os.path.exists(doc['filepath']):
+                                zipf.write(doc['filepath'], doc['filename'])
+                    
+                    # Add ZIP file info to response
+                    zip_size = os.path.getsize(zip_path)
+                    zip_doc = {
+                        'title': f'Complete Proposal Package',
+                        'description': f'All {len(generated_docs)} deliverables in one package',
+                        'format': 'zip',
+                        'size': f'{zip_size // 1024} KB',
+                        'filename': zip_filename,
+                        'download_url': f'/download-proposal/{zip_filename}',
+                        'filepath': zip_path
+                    }
+                    
+                    generated_docs.append(zip_doc)
+                    print(f"✅ Created batch ZIP: {zip_filename}")
+                    
+                except Exception as e:
+                    print(f"⚠️ Failed to create ZIP file: {e}")
+
             return jsonify({
                 'success': True,
                 'documents': generated_docs,
-                'message': f'Successfully generated {len(generated_docs)} documents'
+                'generation_mode': generation_mode,
+                'message': f'Successfully generated {len(generated_docs) - (1 if generation_mode == "batch" and len(generated_docs) > 1 else 0)} documents'
             })
 
         except Exception as e:
@@ -2778,15 +1588,43 @@ def create_app():
             traceback.print_exc()
             return jsonify({'success': False, 'error': str(e)}), 500
 
+    @app.route('/api/custom-deliverables', methods=['GET'])
+    @login_required
+    def get_custom_deliverables():
+        """Get user's custom deliverables"""
+        try:
+            from models import User, CustomDeliverable
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+            
+            deliverables = CustomDeliverable.query.filter_by(user_id=user.id).all()
+            
+            deliverable_list = []
+            for d in deliverables:
+                deliverable_list.append({
+                    'id': d.id,
+                    'title': d.title,
+                    'description': d.description,
+                    'icon': d.icon,
+                    'prompt_template': d.prompt_template,
+                    'created_at': d.created_at.isoformat() if d.created_at else None
+                })
+            
+            return jsonify({
+                'success': True,
+                'deliverables': deliverable_list
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     @app.route('/download-proposal/<filename>')
+    @login_required
     def download_proposal(filename):
         """Download generated proposal document"""
-        if 'username' not in session:
-            return redirect('/login')
-
         try:
-            # Security: ensure filename is safe and user has access
-            import os
             from werkzeug.utils import secure_filename
 
             safe_filename = secure_filename(filename)
@@ -2806,553 +1644,349 @@ def create_app():
             flash(f'Download error: {e}')
             return redirect('/projects')
 
-    @app.route('/api/proposal-status/<project_id>')
-    def get_proposal_status(project_id):
-        """Get status of proposal generation"""
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
+    # ========================================
+    # UTILITY ROUTES
+    # ========================================
 
+    @app.route('/debug-routes')
+    def debug_routes():
+        """Debug route listing"""
+        routes = []
+        for rule in app.url_map.iter_rules():
+            routes.append({
+                'endpoint': rule.endpoint,
+                'methods': list(rule.methods),
+                'rule': rule.rule
+            })
+        return jsonify(routes)
+
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint with system status"""
+        system_status = get_system_status()
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'service': 'tender-analysis-system',
+            'version': '2.0.0',
+            'system_status': system_status
+        })
+
+    @app.route('/create-admin')
+    def force_create_admin():
+        """Force create admin user for initial setup"""
         try:
-            # Check if there are any generated proposals for this project
-            proposal_dir = 'generated_proposals'
-            if not os.path.exists(proposal_dir):
-                return jsonify({'status': 'no_proposals', 'proposals': []})
+            from models import User
 
-            # Find proposals for this project
-            project_proposals = []
-            project_name = None
+            # Check if admin exists
+            admin = User.query.filter_by(username='admin').first()
+            if admin:
+                return jsonify({'status': 'Admin already exists', 'username': 'admin'})
 
+            # Create admin user
+            admin = User(
+                username='admin',
+                email='admin@tenderanalysis.com',
+                full_name='System Administrator',
+                role='admin'
+            )
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+
+            return jsonify({
+                'status': 'Admin user created successfully',
+                'username': 'admin',
+                'password': 'admin123'
+            })
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/update-database')
+    def update_database_route():
+        """Force database schema update - useful for Docker deployments"""
+        try:
+            from models import AIAnalysisResult, init_db
+            
+            # Force create all tables
+            db.create_all()
+            
+            # Test AI analysis table
             try:
-                from models import Project, User
-                user = User.query.filter_by(username=session['username']).first()
-                project = Project.query.filter_by(id=project_id, user_id=user.id).first()
-                if project:
-                    project_name = project.name.replace(' ', '_')
-            except:
-                pass
+                count = AIAnalysisResult.query.count()
+                ai_table_status = f"AI Analysis table working - {count} records"
+            except Exception as e:
+                # Try to create the table again
+                db.create_all()
+                count = AIAnalysisResult.query.count()
+                ai_table_status = f"AI Analysis table created - {count} records"
+            
+            # Run full database initialization
+            init_db(app)
+            
+            return jsonify({
+                'status': 'Database updated successfully',
+                'ai_analysis_table': ai_table_status,
+                'timestamp': datetime.now().isoformat(),
+                'message': 'All database tables verified and updated'
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'error': str(e),
+                'message': 'Database update failed'
+            }), 500
 
-            if project_name:
-                for filename in os.listdir(proposal_dir):
-                    if filename.startswith(project_name):
-                        filepath = os.path.join(proposal_dir, filename)
-                        stat = os.stat(filepath)
-
-                        # Parse document type from filename
-                        doc_type = 'unknown'
-                        if '_technical_' in filename:
-                            doc_type = 'technical'
-                        elif '_commercial_' in filename:
-                            doc_type = 'commercial'
-                        elif '_implementation_' in filename:
-                            doc_type = 'implementation'
-                        elif '_architecture_' in filename:
-                            doc_type = 'architecture'
-                        elif '_company_' in filename:
-                            doc_type = 'company'
-                        elif '_compliance_' in filename:
-                            doc_type = 'compliance'
-
-                        project_proposals.append({
-                            'filename': filename,
-                            'type': doc_type,
-                            'size': f"{stat.st_size / 1024:.1f} KB",
-                            'created': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
-                            'download_url': f'/download-proposal/{filename}'
-                        })
-
+    @app.route('/debug/documents')
+    @login_required 
+    def debug_documents():
+        """Debug route to check document extraction status"""
+        try:
+            from models import User, Document
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Get all documents for debugging
+            documents = Document.query.filter_by(uploaded_by=user.id).order_by(Document.uploaded_at.desc()).limit(20).all()
+            
+            doc_info = []
+            for doc in documents:
+                doc_info.append({
+                    'id': doc.id,
+                    'filename': doc.original_filename or doc.filename,
+                    'file_size': doc.file_size,
+                    'uploaded_at': doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                    'processing_status': getattr(doc, 'processing_status', 'unknown'),
+                    'has_extracted_content': bool(doc.extracted_content and doc.extracted_content.strip()),
+                    'extracted_content_length': len(doc.extracted_content) if doc.extracted_content else 0,
+                    'extracted_content_preview': doc.extracted_content[:200] + '...' if doc.extracted_content and len(doc.extracted_content) > 200 else doc.extracted_content,
+                    'error_message': getattr(doc, 'error_message', None),
+                    'project_id': doc.project_id
+                })
+            
             return jsonify({
                 'status': 'success',
-                'proposal_count': len(project_proposals),
-                'proposals': project_proposals
+                'documents_count': len(documents),
+                'documents': doc_info,
+                'document_processor_available': app.config.get('DOCUMENT_PROCESSOR') is not None,
+                'anthropic_api_configured': bool(os.getenv('ANTHROPIC_API_KEY'))
             })
-
+            
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/delete-proposal/<filename>')
-    def delete_proposal(filename):
-        """Delete a generated proposal"""
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
-
-        try:
-            from werkzeug.utils import secure_filename
-            safe_filename = secure_filename(filename)
-            filepath = os.path.join('generated_proposals', safe_filename)
-
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                return jsonify({'success': True, 'message': 'Proposal deleted successfully'})
-            else:
-                return jsonify({'success': False, 'error': 'File not found'}), 404
-
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
-
-    @app.route('/proposals/<project_id>')
-    def view_proposals(project_id):
-        """View all generated proposals for a project"""
-        if 'username' not in session:
-            return redirect('/login')
-
-        try:
-            from models import User, Project
-            user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
-
-            return render_template_string('''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Generated Proposals - {{ project.name }}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                    .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                    .btn:hover { background: #5a6fd8; }
-                    .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                    .btn-danger { background: #dc3545; } .btn-danger:hover { background: #c82333; }
-                    .proposal-card {
-                        background: #f8f9fa;
-                        border: 1px solid #e9ecef;
-                        border-radius: 8px;
-                        padding: 20px;
-                        margin: 15px 0;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    }
-                    .proposal-info h4 { margin: 0 0 10px 0; color: #495057; }
-                    .proposal-info p { margin: 5px 0; color: #6c757d; }
-                    .proposal-actions { display: flex; gap: 10px; }
-                    .loading { text-align: center; padding: 40px; color: #6c757d; }
-                    .no-proposals { text-align: center; padding: 40px; background: #fff3cd; border-radius: 8px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <div>
-                            <h1>📄 Generated Proposals</h1>
-                            <p style="color: #6c757d;">Project: {{ project.name }}</p>
-                        </div>
-                        <div>
-                            <a href="/analysis/{{ project.id }}" class="btn">← Back to Analysis</a>
-                            <a href="/generate-proposal/{{ project.id }}" class="btn btn-success">+ Generate New</a>
-                        </div>
-                    </div>
-
-                    <div id="proposalsList" class="loading">
-                        <h3>📋 Loading proposals...</h3>
-                    </div>
-                </div>
-
-                <script>
-                async function loadProposals() {
-                    try {
-                        const response = await fetch('/api/proposal-status/{{ project.id }}');
-                        const data = await response.json();
-
-                        const proposalsList = document.getElementById('proposalsList');
-
-                        if (data.proposal_count === 0) {
-                            proposalsList.innerHTML = `
-                                <div class="no-proposals">
-                                    <h3>📄 No Proposals Generated Yet</h3>
-                                    <p>Generate your first proposal documents to get started.</p>
-                                    <a href="/generate-proposal/{{ project.id }}" class="btn btn-success">Generate Proposals</a>
-                                </div>
-                            `;
-                            return;
-                        }
-
-                        const proposalsHtml = data.proposals.map(proposal => {
-                            const typeNames = {
-                                'technical': 'Technical Proposal',
-                                'commercial': 'Commercial Proposal',
-                                'implementation': 'Implementation Plan',
-                                'architecture': 'Technical Architecture',
-                                'company': 'Company Profile',
-                                'compliance': 'Compliance Matrix',
-                                'unknown': 'Proposal Document'
-                            };
-
-                            const typeIcons = {
-                                'technical': '⚙️',
-                                'commercial': '💰',
-                                'implementation': '🚀',
-                                'architecture': '🏗️',
-                                'company': '🏢',
-                                'compliance': '✅',
-                                'unknown': '📄'
-                            };
-
-                            return `
-                                <div class="proposal-card">
-                                    <div class="proposal-info">
-                                        <h4>${typeIcons[proposal.type] || '📄'} ${typeNames[proposal.type] || 'Proposal Document'}</h4>
-                                        <p><strong>File:</strong> ${proposal.filename}</p>
-                                        <p><strong>Size:</strong> ${proposal.size} | <strong>Created:</strong> ${proposal.created}</p>
-                                    </div>
-                                    <div class="proposal-actions">
-                                        <a href="${proposal.download_url}" class="btn btn-success" download>
-                                            📥 Download
-                                        </a>
-                                        <button onclick="deleteProposal('${proposal.filename}')" class="btn btn-danger">
-                                            🗑️ Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-
-                        proposalsList.innerHTML = `
-                            <h3>📋 Generated Proposals (${data.proposal_count})</h3>
-                            ${proposalsHtml}
-                        `;
-
-                    } catch (error) {
-                        document.getElementById('proposalsList').innerHTML = `
-                            <div style="text-align: center; padding: 40px; color: #dc3545;">
-                                <h3>❌ Error Loading Proposals</h3>
-                                <p>${error.message}</p>
-                                <button onclick="loadProposals()" class="btn">Try Again</button>
-                            </div>
-                        `;
-                    }
-                }
-
-                async function deleteProposal(filename) {
-                    if (!confirm('Are you sure you want to delete this proposal?')) {
-                        return;
-                    }
-
-                    try {
-                        const response = await fetch(`/api/delete-proposal/${filename}`, {
-                            method: 'DELETE'
-                        });
-
-                        const result = await response.json();
-
-                        if (result.success) {
-                            alert('Proposal deleted successfully');
-                            loadProposals(); // Reload the list
-                        } else {
-                            alert('Error deleting proposal: ' + result.error);
-                        }
-
-                    } catch (error) {
-                        alert('Error deleting proposal: ' + error.message);
-                    }
-                }
-
-                // Load proposals when page loads
-                document.addEventListener('DOMContentLoaded', loadProposals);
-                </script>
-            </body>
-            </html>
-            ''', project=project)
-
-        except Exception as e:
-            flash(f'Error loading proposals: {e}')
-            return redirect('/projects')
-
-    # Add this route to make the proposals accessible from the analysis page
-    @app.route('/api/check-proposals/<project_id>')
-    def check_proposals_exist(project_id):
-        """Quick check if proposals exist for a project"""
-        if 'username' not in session:
-            return jsonify({'error': 'Not logged in'}), 401
-
-        try:
-            proposal_dir = 'generated_proposals'
-            if not os.path.exists(proposal_dir):
-                return jsonify({'has_proposals': False, 'count': 0})
-
-            # Get project name for file matching
-            from models import Project, User
-            user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
-
-            if not project:
-                return jsonify({'has_proposals': False, 'count': 0})
-
-            project_name = project.name.replace(' ', '_')
-            proposal_count = sum(1 for f in os.listdir(proposal_dir) if f.startswith(project_name))
-
-            return jsonify({
-                'has_proposals': proposal_count > 0,
-                'count': proposal_count
-            })
-
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    # ========================================
-    # PARTNER RECOMMENDATION & SELECTION
-    # ========================================
-
-    @app.route('/projects/<project_id>/partner-recommendations')
+    @app.route('/debug/extract-document/<int:document_id>')
     @login_required
-    def view_partner_recommendations(project_id):
-        """View and select partner recommendations for a project"""
+    def debug_extract_document(document_id):
+        """Debug route to manually extract content from a specific document"""
         try:
-            from models import User, Project, Partner, PartnerProduct
+            from models import User, Document
+            
             user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
-
-            # Get analysis results for intelligent matching
-            analysis_results = get_real_analysis_results(project_id)
-
-            # Get all active partner products
-            partner_products = db.session.query(PartnerProduct).join(Partner).filter(
-                Partner.status == 'ACTIVE'
-            ).all()
-
-            # Simple keyword matching for recommendations
-            recommendations = []
-            for product in partner_products:
-                fit_score = calculate_simple_fit_score(analysis_results, product)
-                if fit_score > 30:  # Show products with some relevance
-                    recommendations.append({
-                        'product': product,
-                        'partner': product.partner,
-                        'fit_score': fit_score,
-                        'reasoning': generate_fit_reasoning(analysis_results, product),
-                        'estimated_cost': estimate_product_cost(product),
-                        'integration_scope': determine_integration_scope(fit_score)
-                    })
-
-            # Sort by fit score
-            recommendations.sort(key=lambda x: x['fit_score'], reverse=True)
-
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            # Get the document
+            document = Document.query.filter_by(id=document_id, uploaded_by=user.id).first()
+            if not document:
+                return jsonify({'error': 'Document not found'}), 404
+            
+            # Extract content
+            document_processor = app.config.get('DOCUMENT_PROCESSOR')
+            if not document_processor:
+                return jsonify({'error': 'Document processor not available'}), 500
+            
+            try:
+                # Check if file exists
+                if not os.path.exists(document.file_path):
+                    return jsonify({'error': f'File not found: {document.file_path}'}), 404
+                
+                # Extract content using file extension as fallback
+                original_filename = document.original_filename or document.filename
+                file_extension = original_filename.lower().split('.')[-1]
+                
+                extracted_content = ""
+                if file_extension == 'pdf':
+                    extracted_content = document_processor.extract_text_from_pdf(document.file_path)
+                elif file_extension in ['docx', 'doc']:
+                    extracted_content = document_processor.extract_text_from_docx(document.file_path)
+                elif file_extension in ['xlsx', 'xls']:
+                    extracted_content = document_processor.extract_text_from_xlsx(document.file_path)
+                elif file_extension == 'txt':
+                    with open(document.file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        extracted_content = f.read()
+                else:
+                    return jsonify({'error': f'Unsupported file type: {file_extension}'}), 400
+                
+                # Update the document
+                document.extracted_content = extracted_content
+                if hasattr(document, 'processing_status'):
+                    document.processing_status = 'processed' if extracted_content else 'failed'
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'document_id': document_id,
+                    'filename': original_filename,
+                    'extracted_length': len(extracted_content) if extracted_content else 0,
+                    'extracted_preview': extracted_content[:300] + '...' if extracted_content and len(extracted_content) > 300 else extracted_content,
+                    'message': f'Extracted {len(extracted_content)} characters' if extracted_content else 'No content extracted'
+                })
+                
+            except Exception as e:
+                return jsonify({'error': f'Extraction failed: {str(e)}'}), 500
+            
         except Exception as e:
-            flash(f"Error loading recommendations: {e}")
-            return redirect('/projects')
+            return jsonify({'error': str(e)}), 500
 
-        return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Partner Recommendations - {{ project.name }}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-                .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
-                .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; border: none; cursor: pointer; }
-                .btn:hover { background: #5a6fd8; }
-                .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
-                .btn-warning { background: #ffc107; color: #212529; } .btn-warning:hover { background: #e0a800; }
-                .recommendations-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-                .recommendation-card {
-                    background: #f8f9fa;
-                    border: 1px solid #e9ecef;
-                    border-radius: 8px;
-                    padding: 20px;
-                    transition: all 0.3s;
-                    position: relative;
-                }
-                .recommendation-card.selected { border-color: #28a745; background: #d4edda; }
-                .recommendation-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-                .fit-score { position: absolute; top: 15px; right: 15px; background: #1f4397; color: white; padding: 5px 10px; border-radius: 15px; font-weight: bold; }
-                .fit-score.high { background: #28a745; }
-                .fit-score.medium { background: #ffc107; color: #212529; }
-                .fit-score.low { background: #dc3545; }
-                .product-header { margin-bottom: 15px; }
-                .product-header h5 { margin: 0; color: #495057; }
-                .product-header small { color: #6c757d; }
-                .integration-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin: 5px 0; }
-                .integration-core { background: #dc3545; color: white; }
-                .integration-addon { background: #1f4397; color: white; }
-                .integration-optional { background: #6c757d; color: white; }
-                .cost-info { background: white; padding: 10px; border-radius: 5px; margin: 10px 0; }
-                .reasoning-box { background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 14px; }
-                .selection-controls { margin-top: 15px; display: flex; gap: 10px; align-items: center; }
-                .checkbox-large { transform: scale(1.5); margin-right: 10px; }
-                .no-recommendations { text-align: center; padding: 60px; color: #6c757d; }
-                .summary-panel { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-                .selected-count { background: #28a745; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; display: none; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div>
-                        <h1>🤝 Partner Recommendations</h1>
-                        <p style="color: #6c757d;">AI-powered partner product suggestions for {{ project.name }}</p>
-                    </div>
-                    <div>
-                        <a href="/analysis/{{ project.id }}" class="btn">← Back to Analysis</a>
-                        <button id="proceedBtn" class="btn btn-success" onclick="proceedToProposal()" disabled>
-                            📝 Proceed to Proposal Generation
-                        </button>
-                    </div>
-                </div>
+    # ========================================
+    # PAST PROPOSALS MANAGEMENT
+    # ========================================
 
-                <div class="summary-panel">
-                    <h4>📊 Project Analysis Summary</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div><strong>Must-Have:</strong> {{ analysis_results.must_have_requirements|length }} requirements</div>
-                        <div><strong>Good-to-Have:</strong> {{ analysis_results.good_to_have_requirements|length }} requirements</div>
-                        <div><strong>Technical Specs:</strong> {{ analysis_results.technical_specifications|length }} specifications</div>
-                        <div><strong>Available Partners:</strong> {{ recommendations|length }} products found</div>
-                    </div>
-                </div>
+    @app.route('/past-proposals')
+    @login_required
+    def past_proposals_page():
+        """Page for managing past proposals"""
+        try:
+            from proposal_manager import get_proposal_manager
+            
+            proposal_manager = get_proposal_manager()
+            proposals = proposal_manager.get_all_proposals(limit=50)
+            stats = proposal_manager.get_proposal_statistics()
+            
+            return render_template('past_proposals.html', 
+                                 proposals=proposals,
+                                 stats=stats)
+        except Exception as e:
+            flash(f'Error loading past proposals: {e}', 'error')
+            return redirect('/')
 
-                <div id="selectedCount" class="selected-count">
-                    <strong>🎯 <span id="countText">0</span> partner products selected for proposal</strong>
-                </div>
-
-                {% if recommendations %}
-                <div class="recommendations-grid">
-                    {% for rec in recommendations %}
-                    <div class="recommendation-card" data-product-id="{{ rec.product.id }}">
-                        <div class="fit-score {{ 'high' if rec.fit_score >= 80 else 'medium' if rec.fit_score >= 60 else 'low' }}">
-                            {{ "%.0f"|format(rec.fit_score) }}%
-                        </div>
-
-                        <div class="product-header">
-                            <h5>{{ rec.product.product_name }}</h5>
-                            <small>by {{ rec.partner.name }} | {{ rec.product.category }}</small>
-                        </div>
-
-                        <p style="color: #6c757d; font-size: 14px; margin: 10px 0;">
-                            {{ rec.product.functionality[:150] }}{% if rec.product.functionality|length > 150 %}...{% endif %}
-                        </p>
-
-                        <div>
-                            <span class="integration-badge integration-{{ rec.integration_scope.lower() }}">
-                                {{ rec.integration_scope }} Integration
-                            </span>
-                            {% if rec.product.api_available %}
-                            <span style="color: #28a745; font-size: 12px;">✅ API Available</span>
-                            {% endif %}
-                            {% if rec.product.cloud_native %}
-                            <span style="color: #1f4397; font-size: 12px;">☁️ Cloud Native</span>
-                            {% endif %}
-                        </div>
-
-                        <div class="cost-info">
-                            <strong>Estimated Cost:</strong> ${{ "{:,.0f}"|format(rec.estimated_cost) }}
-                            <br><strong>Implementation:</strong> {{ rec.product.implementation_time or 'TBD' }}
-                            <br><strong>Pricing:</strong> {{ rec.product.pricing_type }}
-                        </div>
-
-                        <div class="reasoning-box">
-                            <strong>🤖 AI Analysis:</strong><br>
-                            {{ rec.reasoning }}
-                        </div>
-
-                        <div class="selection-controls">
-                            <input type="checkbox" class="checkbox-large product-checkbox"
-                                   data-product-id="{{ rec.product.id }}"
-                                   data-partner-name="{{ rec.partner.name }}"
-                                   data-product-name="{{ rec.product.product_name }}"
-                                   data-cost="{{ rec.estimated_cost }}"
-                                   data-scope="{{ rec.integration_scope }}"
-                                   onchange="updateSelection()">
-                            <label><strong>Include in Proposal</strong></label>
-                            <button class="btn" style="margin-left: auto; padding: 5px 10px;" onclick="showDetails({{ rec.product.id }})">
-                                📋 View Details
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="no-recommendations">
-                    <h3>🔍 No Partner Recommendations Found</h3>
-                    <p>No partner products match your current project requirements.</p>
-                    <div style="margin-top: 20px;">
-                        <a href="/settings/partners" class="btn">🤝 Add More Partners</a>
-                        <a href="/analysis/{{ project.id }}" class="btn btn-warning">📊 Back to Analysis</a>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div style="margin-top: 40px; padding: 20px; background: #e3f2fd; border-radius: 8px;">
-                    <h4>ℹ️ How Partner Recommendations Work</h4>
-                    <ul>
-                        <li><strong>AI Analysis:</strong> System analyzes your project requirements against partner product capabilities</li>
-                        <li><strong>Fit Scoring:</strong> Each product gets a compatibility score (0-100%) based on technical and business fit</li>
-                        <li><strong>Integration Scope:</strong> Core (essential), Add-on (valuable), Optional (nice-to-have)</li>
-                        <li><strong>Cost Integration:</strong> Selected partner costs are included in final proposal pricing</li>
-                    </ul>
-                </div>
-            </div>
-
-            <script>
-            let selectedProducts = [];
-
-            function updateSelection() {
-                const checkboxes = document.querySelectorAll('.product-checkbox:checked');
-                selectedProducts = Array.from(checkboxes).map(cb => ({
-                    productId: cb.dataset.productId,
-                    partnerName: cb.dataset.partnerName,
-                    productName: cb.dataset.productName,
-                    cost: parseFloat(cb.dataset.cost),
-                    scope: cb.dataset.scope
-                }));
-
-                // Update selected count display
-                const countDisplay = document.getElementById('selectedCount');
-                const countText = document.getElementById('countText');
-                const proceedBtn = document.getElementById('proceedBtn');
-
-                if (selectedProducts.length > 0) {
-                    countText.textContent = selectedProducts.length;
-                    countDisplay.style.display = 'block';
-                    proceedBtn.disabled = false;
-                    proceedBtn.textContent = `📝 Generate Proposal with ${selectedProducts.length} Partner Products`;
-                } else {
-                    countDisplay.style.display = 'none';
-                    proceedBtn.disabled = false; // Allow proceeding without partners
-                    proceedBtn.textContent = '📝 Proceed to Proposal Generation';
-                }
-
-                // Update card styling
-                document.querySelectorAll('.recommendation-card').forEach(card => {
-                    const checkbox = card.querySelector('.product-checkbox');
-                    if (checkbox.checked) {
-                        card.classList.add('selected');
-                    } else {
-                        card.classList.remove('selected');
-                    }
-                });
-
-                console.log('Selected products:', selectedProducts);
+    @app.route('/api/upload-past-proposal', methods=['POST'])
+    @login_required
+    def upload_past_proposal():
+        """Upload a past proposal for vector storage"""
+        try:
+            from models import User
+            from proposal_manager import get_proposal_manager
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            if 'file' not in request.files:
+                return jsonify({'error': 'No file provided'}), 400
+            
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            
+            # Get metadata from form
+            metadata = {
+                'title': request.form.get('title', file.filename),
+                'client_name': request.form.get('client_name', 'Unknown'),
+                'project_type': request.form.get('project_type', 'unknown'),
+                'proposal_type': request.form.get('proposal_type', 'technical'),
+                'submission_year': int(request.form.get('submission_year', datetime.now().year)),
+                'proposal_value': float(request.form.get('proposal_value', 0)) if request.form.get('proposal_value') else None,
+                'currency': request.form.get('currency', 'USD'),
+                'status': request.form.get('status', 'unknown'),
+                'win_probability': float(request.form.get('win_probability', 0)) if request.form.get('win_probability') else None,
+                'industry_sector': request.form.get('industry_sector'),
+                'project_duration': request.form.get('project_duration'),
+                'team_size': int(request.form.get('team_size', 0)) if request.form.get('team_size') else None,
+                'technologies_used': request.form.get('technologies_used', '').split(',') if request.form.get('technologies_used') else [],
+                'lessons_learned': request.form.get('lessons_learned'),
+                'key_success_factors': request.form.get('key_success_factors', '').split(',') if request.form.get('key_success_factors') else [],
+                'key_challenges': request.form.get('key_challenges', '').split(',') if request.form.get('key_challenges') else []
             }
+            
+            # Save file
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            unique_filename = f"past_{timestamp}_{filename}"
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(file_path)
+            
+            # Process with proposal manager
+            proposal_manager = get_proposal_manager()
+            result = proposal_manager.upload_past_proposal(
+                file_path=file_path,
+                filename=filename,
+                metadata=metadata,
+                user_id=user.id
+            )
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-            function proceedToProposal() {
-                // Store selected partner products in session/localStorage for proposal generation
-                sessionStorage.setItem('selectedPartnerProducts', JSON.stringify(selectedProducts));
+    @app.route('/api/past-proposals/search', methods=['POST'])
+    @login_required
+    def search_past_proposals():
+        """Search past proposals by similarity"""
+        try:
+            from proposal_manager import get_proposal_manager
+            
+            data = request.get_json()
+            query = data.get('query', '')
+            limit = data.get('limit', 10)
+            filters = data.get('filters', {})
+            
+            if not query:
+                return jsonify({'error': 'Query is required'}), 400
+            
+            proposal_manager = get_proposal_manager()
+            results = proposal_manager.get_proposals_by_similarity(
+                query=query,
+                limit=limit,
+                filters=filters
+            )
+            
+            return jsonify({
+                'success': True,
+                'results': results,
+                'count': len(results)
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-                // Proceed to proposal generation with partner data
-                window.location.href = `/generate-proposal/{{ project.id }}?partners=${selectedProducts.length}`;
-            }
+    @app.route('/api/past-proposals/stats')
+    @login_required
+    def get_proposal_stats():
+        """Get statistics about past proposals"""
+        try:
+            from proposal_manager import get_proposal_manager
+            
+            proposal_manager = get_proposal_manager()
+            stats = proposal_manager.get_proposal_statistics()
+            
+            return jsonify(stats)
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-            function showDetails(productId) {
-                // You can implement a modal or redirect to product details
-                alert(`Product details for ID: ${productId}`);
-            }
-
-            // Auto-select high-scoring products (optional)
-            document.addEventListener('DOMContentLoaded', function() {
-                const highScoreProducts = document.querySelectorAll('.fit-score.high');
-                highScoreProducts.forEach(scoreElement => {
-                    const card = scoreElement.closest('.recommendation-card');
-                    const checkbox = card.querySelector('.product-checkbox');
-                    if (checkbox) {
-                        checkbox.checked = true;
-                    }
-                });
-                updateSelection();
-            });
-            </script>
-        </body>
-        </html>
-        ''', project=project, analysis_results=analysis_results, recommendations=recommendations)
+    @app.route('/api/vector-store/test')
+    @login_required
+    def test_vector_store():
+        """Test vector store functionality"""
+        try:
+            from vector_store import test_vector_store
+            
+            success = test_vector_store()
+            return jsonify({
+                'success': success,
+                'message': 'Vector store test completed',
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     # Helper functions for partner recommendations
     def calculate_simple_fit_score(analysis_results, product):
@@ -3455,91 +2089,1372 @@ def create_app():
             return 'OPTIONAL'
 
     # ========================================
-    # HEALTH & STATUS ENDPOINTS
+    # AI PROVIDER CONFIGURATION ROUTES
+    # ========================================
+    
+    @app.route('/ai-settings')
+    @login_required
+    def ai_settings_page():
+        """AI provider settings page"""
+        return render_template('ai_settings.html')
+    
+    @app.route('/api/ai/providers')
+    @login_required
+    def get_ai_providers():
+        """Get available AI providers and their status"""
+        try:
+            from ai_providers import get_ai_manager
+            from ai_config import get_ai_config, validate_api_keys, get_available_models
+            
+            manager = get_ai_manager()
+            config = get_ai_config()
+            keys_status = validate_api_keys()
+            
+            return jsonify({
+                'success': True,
+                'providers': manager.get_provider_status(),
+                'config': {
+                    'preferred_provider': config['preferred_provider'],
+                    'fallback_enabled': config['fallback_enabled'],
+                    'current_models': {
+                        'claude': config['claude']['model'],
+                        'openai': config['openai']['model']
+                    }
+                },
+                'available_models': {
+                    'claude': get_available_models('claude'),
+                    'openai': get_available_models('openai')
+                },
+                'api_keys': keys_status
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/providers/switch', methods=['POST'])
+    @login_required
+    def switch_ai_provider():
+        """Switch the preferred AI provider"""
+        try:
+            from ai_providers import set_preferred_provider
+            
+            data = request.get_json()
+            provider = data.get('provider')
+            
+            if provider not in ['claude', 'openai']:
+                return jsonify({'success': False, 'error': 'Invalid provider'})
+            
+            set_preferred_provider(provider)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Switched to {provider}',
+                'provider': provider
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/models/switch', methods=['POST'])
+    @login_required  
+    def switch_ai_model():
+        """Switch the model for a specific provider"""
+        try:
+            from ai_config import validate_model
+            
+            data = request.get_json()
+            provider = data.get('provider')
+            model = data.get('model')
+            
+            if provider not in ['claude', 'openai']:
+                return jsonify({'success': False, 'error': 'Invalid provider'})
+            
+            if not validate_model(provider, model):
+                return jsonify({'success': False, 'error': 'Invalid model for provider'})
+            
+            # Update environment variable for this session
+            env_var = 'CLAUDE_MODEL' if provider == 'claude' else 'OPENAI_MODEL'
+            os.environ[env_var] = model
+            
+            # Update AI manager's configuration
+            from ai_providers import get_ai_manager
+            manager = get_ai_manager()
+            # Force reload configuration
+            manager.__init__(manager.preferred_provider)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Switched {provider} model to {model}',
+                'provider': provider,
+                'model': model
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/models', methods=['GET'])
+    @login_required  
+    def get_ai_models():
+        """Get available models for all providers"""
+        try:
+            from ai_config import get_available_models, get_ai_config
+            
+            config = get_ai_config()
+            
+            return jsonify({
+                'success': True,
+                'models': {
+                    'claude': get_available_models('claude'),
+                    'openai': get_available_models('openai')
+                },
+                'current_models': {
+                    'claude': config['claude']['model'],
+                    'openai': config['openai']['model']
+                }
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/test', methods=['POST'])
+    @login_required  
+    def test_ai_provider():
+        """Test AI provider with a simple request"""
+        try:
+            from ai_providers import get_ai_manager
+            
+            data = request.get_json()
+            provider = data.get('provider')
+            
+            manager = get_ai_manager()
+            
+            test_messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Say 'Hello, this is a test' in exactly those words."}
+            ]
+            
+            result = manager.chat_completion(test_messages, provider=provider, max_tokens=50)
+            
+            return jsonify({
+                'success': result['success'],
+                'response': result.get('content', 'No response'),
+                'provider_used': result.get('provider'),
+                'error': result.get('error')
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    # ========================================
+    # AI RESPONSE MANAGEMENT ROUTES
+    # ========================================
+    
+    @app.route('/api/ai/responses/<project_id>')
+    @login_required
+    def get_ai_responses(project_id):
+        """Get all AI responses for a project"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            request_type = request.args.get('type')
+            include_archived = request.args.get('archived', 'false').lower() == 'true'
+            limit = int(request.args.get('limit', 50))
+            
+            responses = AIResponseManager.get_project_responses(
+                project_id=project_id,
+                request_type=request_type,
+                include_archived=include_archived,
+                limit=limit
+            )
+            
+            return jsonify({
+                'success': True,
+                'responses': [r.to_dict() for r in responses],
+                'total': len(responses)
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/responses/<project_id>/history')
+    @login_required
+    def get_ai_response_history(project_id):
+        """Get AI response history with family grouping"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            request_type = request.args.get('type')
+            group_families = request.args.get('group', 'true').lower() == 'true'
+            
+            history = AIResponseManager.get_response_history(
+                project_id=project_id,
+                request_type=request_type,
+                group_by_family=group_families
+            )
+            
+            stats = AIResponseManager.get_response_stats(project_id)
+            
+            return jsonify({
+                'success': True,
+                'history': history,
+                'stats': stats
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/response/<response_id>')
+    @login_required
+    def get_ai_response_detail(response_id):
+        """Get detailed view of a specific AI response"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            response = AIResponseManager.get_response_by_id(response_id)
+            if not response:
+                return jsonify({'success': False, 'error': 'Response not found'}), 404
+            
+            # Mark as viewed
+            response.mark_viewed()
+            
+            # Get related responses
+            children = response.get_child_responses()
+            parent = response.get_parent_response()
+            
+            return jsonify({
+                'success': True,
+                'response': {
+                    **response.to_dict(),
+                    'full_response': response.raw_response,
+                    'parsed_response': response.parsed_response,
+                    'metadata': response.response_metadata,
+                    'prompt_used': response.prompt_used[:1000] + '...' if len(response.prompt_used) > 1000 else response.prompt_used,  # Truncate long prompts
+                },
+                'children': [c.to_dict() for c in children],
+                'parent': parent.to_dict() if parent else None
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/response/<response_id>/rerun', methods=['POST'])
+    @login_required
+    def rerun_ai_response(response_id):
+        """Create a rerun of an existing AI response"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            data = request.get_json() or {}
+            reason = data.get('reason', 'Manual rerun')
+            
+            rerun_response = AIResponseManager.create_rerun(response_id, reason)
+            if not rerun_response:
+                return jsonify({'success': False, 'error': 'Original response not found'}), 404
+            
+            # Trigger actual AI rerun based on original response parameters
+            original_response = AIResponseManager.get_response_by_id(response_id)
+            if not original_response:
+                return jsonify({'success': False, 'error': 'Original response not found'}), 404
+            
+            # Execute rerun in background to avoid timeout
+            try:
+                from real_analysis_system import RealAnalysisSystem
+                from models import Project
+                
+                project = Project.query.get(original_response.project_id)
+                if not project:
+                    AIResponseManager.fail_response(rerun_response, "Project not found for rerun")
+                    return jsonify({'success': False, 'error': 'Project not found'}), 404
+                
+                analysis_system = RealAnalysisSystem(project)
+                
+                # Recreate content from context_data or use fallback
+                content = original_response.context_data.get('content', '') if original_response.context_data else ''
+                
+                # Execute the appropriate analysis method based on request_type
+                result = None
+                if original_response.request_type == 'clarification_extraction':
+                    if content:
+                        result = analysis_system.extract_clarification_items(content, project_id=project.id)
+                    else:
+                        raise Exception("No content available for rerun")
+                elif original_response.request_type == 'risk_analysis':
+                    if content:
+                        result = analysis_system.identify_risks_and_constraints(content, project_id=project.id)
+                    else:
+                        raise Exception("No content available for rerun")
+                elif original_response.request_type == 'deadline_extraction':
+                    if content:
+                        result = analysis_system.extract_deadlines_and_milestones(content, project_id=project.id)
+                    else:
+                        raise Exception("No content available for rerun")
+                elif original_response.request_type == 'go_no_go_recommendation':
+                    # For go/no-go, we need the other analysis results
+                    # This is more complex, so for now we'll indicate it needs manual trigger
+                    raise Exception("Go/no-go rerun requires manual initiation from analysis page")
+                else:
+                    raise Exception(f"Unsupported request type for rerun: {original_response.request_type}")
+                
+                # The AI response will have been stored automatically by the analysis method
+                return jsonify({
+                    'success': True,
+                    'rerun_response_id': rerun_response.response_id,
+                    'message': 'Rerun completed successfully',
+                    'result_count': len(result) if isinstance(result, list) else 1
+                })
+                
+            except Exception as e:
+                # Mark the rerun as failed
+                AIResponseManager.fail_response(rerun_response, str(e))
+                return jsonify({
+                    'success': False, 
+                    'error': f'Rerun failed: {str(e)}',
+                    'rerun_response_id': rerun_response.response_id
+                })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/response/<response_id>/rate', methods=['POST'])
+    @login_required
+    def rate_ai_response(response_id):
+        """Rate an AI response"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            data = request.get_json()
+            rating = data.get('rating')
+            feedback = data.get('feedback', '')
+            
+            if not rating or not (1 <= int(rating) <= 5):
+                return jsonify({'success': False, 'error': 'Rating must be between 1 and 5'}), 400
+            
+            response = AIResponseManager.get_response_by_id(response_id)
+            if not response:
+                return jsonify({'success': False, 'error': 'Response not found'}), 404
+            
+            response.rate_response(int(rating), feedback)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Response rated successfully'
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/ai/response/<response_id>/favorite', methods=['POST'])
+    @login_required
+    def toggle_ai_response_favorite(response_id):
+        """Toggle favorite status of an AI response"""
+        try:
+            from ai_response_manager import AIResponseManager
+            
+            is_favorite = AIResponseManager.toggle_favorite(response_id)
+            
+            return jsonify({
+                'success': True,
+                'is_favorite': is_favorite
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/ai-responses/<project_id>')
+    @login_required
+    def ai_responses_page(project_id):
+        """AI responses view page"""
+        try:
+            from models import Project, User
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            
+            return render_template('ai_responses.html', project=project)
+        except Exception as e:
+            flash(f'Error loading AI responses: {e}')
+            return redirect('/projects')
+
+    # =============================================================================
+    # ADMIN ROUTES - RFP Types and Workflow Management
+    # =============================================================================
+    
+    @app.route('/admin/rfp-types')
+    @login_required
+    def admin_rfp_types():
+        """RFP Types management page"""
+        return render_template('admin/rfp_types.html')
+    
+    @app.route('/api/admin/rfp-types', methods=['GET'])
+    @login_required
+    def get_admin_rfp_types():
+        """Get all RFP types with statistics"""
+        try:
+            from models import RFPTypeConfig, Project
+            from sqlalchemy import func
+            
+            # Get all RFP types with project counts
+            types = db.session.query(
+                RFPTypeConfig,
+                func.count(Project.id).label('project_count')
+            ).outerjoin(
+                Project, RFPTypeConfig.type_name == Project.rfp_type
+            ).group_by(RFPTypeConfig.id).all()
+            
+            rfp_types = []
+            for rfp_type, project_count in types:
+                type_data = {
+                    'id': rfp_type.id,
+                    'type_name': rfp_type.type_name,
+                    'display_name': rfp_type.display_name,
+                    'description': rfp_type.description,
+                    'default_workflow_stages': rfp_type.default_workflow_stages or [],
+                    'is_active': rfp_type.is_active,
+                    'project_count': project_count
+                }
+                rfp_types.append(type_data)
+            
+            # Calculate statistics
+            total_types = len(rfp_types)
+            active_types = sum(1 for t in rfp_types if t['is_active'])
+            total_projects_using = sum(t['project_count'] for t in rfp_types)
+            
+            stats = {
+                'total': total_types,
+                'active': active_types,
+                'projects_using': total_projects_using
+            }
+            
+            return jsonify({
+                'success': True,
+                'rfp_types': rfp_types,
+                'stats': stats
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/admin/rfp-types', methods=['POST'])
+    @login_required
+    def create_rfp_type():
+        """Create a new RFP type"""
+        try:
+            from models import RFPTypeConfig
+            
+            data = request.get_json()
+            
+            # Validate required fields
+            required_fields = ['type_name', 'display_name']
+            for field in required_fields:
+                if not data.get(field):
+                    return jsonify({'success': False, 'error': f'{field} is required'}), 400
+            
+            # Check if type_name already exists
+            existing = RFPTypeConfig.query.filter_by(type_name=data['type_name']).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Type name already exists'}), 400
+            
+            # Create new RFP type
+            rfp_type = RFPTypeConfig(
+                type_name=data['type_name'],
+                display_name=data['display_name'],
+                description=data.get('description', ''),
+                default_workflow_stages=data.get('default_workflow_stages', ['created', 'approved']),
+                is_active=data.get('is_active', True)
+            )
+            
+            db.session.add(rfp_type)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'RFP type created successfully',
+                'rfp_type_id': rfp_type.id
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/admin/rfp-types/<int:type_id>', methods=['PUT'])
+    @login_required
+    def update_rfp_type(type_id):
+        """Update an existing RFP type"""
+        try:
+            from models import RFPTypeConfig
+            
+            rfp_type = RFPTypeConfig.query.get(type_id)
+            if not rfp_type:
+                return jsonify({'success': False, 'error': 'RFP type not found'}), 404
+            
+            data = request.get_json()
+            
+            # Update fields
+            if 'display_name' in data:
+                rfp_type.display_name = data['display_name']
+            if 'description' in data:
+                rfp_type.description = data['description']
+            if 'default_workflow_stages' in data:
+                rfp_type.default_workflow_stages = data['default_workflow_stages']
+            if 'is_active' in data:
+                rfp_type.is_active = data['is_active']
+            
+            # Don't allow changing type_name after creation to avoid breaking existing projects
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'RFP type updated successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+    
+    @app.route('/api/admin/rfp-types/<int:type_id>', methods=['DELETE'])
+    @login_required
+    def delete_rfp_type(type_id):
+        """Delete an RFP type (only if no projects are using it)"""
+        try:
+            from models import RFPTypeConfig, Project
+            
+            rfp_type = RFPTypeConfig.query.get(type_id)
+            if not rfp_type:
+                return jsonify({'success': False, 'error': 'RFP type not found'}), 404
+            
+            # Check if any projects are using this type
+            project_count = Project.query.filter_by(rfp_type=rfp_type.type_name).count()
+            if project_count > 0:
+                return jsonify({
+                    'success': False, 
+                    'error': f'Cannot delete RFP type. {project_count} project(s) are using it.'
+                }), 400
+            
+            db.session.delete(rfp_type)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'RFP type deleted successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    # ========================================
+    # CUSTOM DELIVERABLE ADMIN ROUTES  
     # ========================================
 
-    @app.route('/health')
-    def health_check():
-        """Health check endpoint with system status"""
-        system_status = get_system_status()
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'service': 'tender-analysis-system',
-            'version': '2.0.0',
-            'system_status': system_status
-        })
+    @app.route('/admin/custom-deliverables')
+    @login_required
+    def admin_custom_deliverables():
+        """Custom deliverables management page"""
+        from models import User, CustomDeliverable
+        
+        user = User.query.filter_by(username=session['username']).first()
+        deliverables = CustomDeliverable.query.filter_by(user_id=user.id).all()
+        
+        return render_template('admin/custom_deliverables.html', 
+                               user=user,
+                               deliverables=deliverables)
 
-    @app.route('/test-db')
-    def test_database():
-        """Test database connection"""
-        system_status = get_system_status()
-        return jsonify(system_status)
-
-    @app.route('/debug-users')
-    def debug_users():
+    @app.route('/api/admin/custom-deliverables', methods=['POST'])
+    @login_required
+    def create_custom_deliverable():
+        """Create a new custom deliverable"""
         try:
-            from models import User
-            users = User.query.all()
-            return jsonify({
-                'user_count': len(users),
-                'users': [{'id': u.id, 'username': u.username, 'email': u.email} for u in users]
-            })
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-
-    @app.route('/create-admin')
-    def force_create_admin():
-        try:
-            from models import User, db
-
-            # Check if admin exists
-            admin = User.query.filter_by(username='admin').first()
-            if admin:
-                return jsonify({'status': 'Admin already exists', 'username': 'admin'})
-
-            # Create admin user
-            admin = User(
-                username='admin',
-                email='admin@tenderanalysis.com',
-                full_name='System Administrator',
-                role='admin'
+            from models import User, CustomDeliverable
+            
+            user = User.query.filter_by(username=session['username']).first()
+            data = request.get_json()
+            
+            deliverable = CustomDeliverable(
+                title=data.get('title'),
+                description=data.get('description'),
+                icon=data.get('icon', 'fas fa-file-alt'),
+                prompt_template=data.get('prompt_template'),
+                user_id=user.id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
-            admin.set_password('admin123')
-            db.session.add(admin)
+            
+            db.session.add(deliverable)
             db.session.commit()
-
+            
             return jsonify({
-                'status': 'Admin user created successfully',
-                'username': 'admin',
-                'password': 'admin123'
+                'success': True,
+                'message': 'Custom deliverable created successfully',
+                'id': deliverable.id
             })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
 
+    @app.route('/api/admin/custom-deliverables/<int:deliverable_id>', methods=['PUT'])
+    @login_required
+    def update_custom_deliverable(deliverable_id):
+        """Update a custom deliverable"""
+        try:
+            from models import User, CustomDeliverable
+            
+            user = User.query.filter_by(username=session['username']).first()
+            deliverable = CustomDeliverable.query.filter_by(id=deliverable_id, user_id=user.id).first()
+            
+            if not deliverable:
+                return jsonify({'success': False, 'error': 'Deliverable not found'}), 404
+            
+            data = request.get_json()
+            
+            # Update fields
+            if 'title' in data:
+                deliverable.title = data['title']
+            if 'description' in data:
+                deliverable.description = data['description']
+            if 'icon' in data:
+                deliverable.icon = data['icon']
+            if 'prompt_template' in data:
+                deliverable.prompt_template = data['prompt_template']
+            
+            deliverable.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Custom deliverable updated successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/admin/custom-deliverables/<int:deliverable_id>', methods=['DELETE'])
+    @login_required
+    def delete_custom_deliverable(deliverable_id):
+        """Delete a custom deliverable"""
+        try:
+            from models import User, CustomDeliverable
+            
+            user = User.query.filter_by(username=session['username']).first()
+            deliverable = CustomDeliverable.query.filter_by(id=deliverable_id, user_id=user.id).first()
+            
+            if not deliverable:
+                return jsonify({'success': False, 'error': 'Deliverable not found'}), 404
+            
+            db.session.delete(deliverable)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Custom deliverable deleted successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/admin/workflows')
+    @login_required
+    def admin_workflows():
+        """Workflows management page"""
+        return render_template('admin/workflows.html')
+
+    @app.route('/admin/partners')
+    @login_required
+    def admin_partners():
+        """Partners management page"""
+        try:
+            from models import Partner
+            partners = Partner.query.all()
+            return render_template('admin/partners.html', partners=partners)
+        except Exception as e:
+            flash(f'Error loading partners: {e}')
+            return redirect('/projects')
+
+    # =============================================================================
+    # PROJECT LIFECYCLE MANAGEMENT - Purge/Restore Functionality
+    # =============================================================================
+    
+    @app.route('/projects/purged')
+    @login_required
+    def purged_projects():
+        """View purged projects"""
+        try:
+            from models import User, Project
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return redirect('/login')
+
+            # Get only purged projects
+            purged_projects = Project.query.filter_by(user_id=user.id, status='purged').order_by(Project.purged_at.desc()).all()
+            
+            return render_template('projects_purged.html', purged_projects=purged_projects)
+        except Exception as e:
+            flash(f'Error loading purged projects: {e}')
+            return redirect('/projects')
+
+    @app.route('/api/project/<project_id>/purge', methods=['POST'])
+    @login_required
+    def purge_project(project_id):
+        """Purge a project to archive section"""
+        try:
+            from models import User, Project
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found'}), 404
+            
+            if project.status == 'purged':
+                return jsonify({'success': False, 'error': 'Project is already purged'}), 400
+
+            data = request.get_json() or {}
+            reason = data.get('reason', 'Project lifecycle completed')
+            
+            # Purge the project
+            project.purge(user.id, reason)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Project "{project.name}" has been purged',
+                'project_id': project_id,
+                'purged_at': project.purged_at.isoformat()
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/project/<project_id>/restore', methods=['POST'])
+    @login_required
+    def restore_project(project_id):
+        """Restore a project from purged state"""
+        try:
+            from models import User, Project
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found'}), 404
+            
+            if project.status != 'purged':
+                return jsonify({'success': False, 'error': 'Project is not purged'}), 400
+            
+            # Restore the project
+            project.restore_from_purge()
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Project "{project.name}" has been restored',
+                'project_id': project_id
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/project/<project_id>/delete-permanently', methods=['DELETE'])
+    @login_required
+    def delete_project_permanently(project_id):
+        """Permanently delete a purged project"""
+        try:
+            from models import User, Project
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found'}), 404
+            
+            if project.status != 'purged':
+                return jsonify({'success': False, 'error': 'Only purged projects can be permanently deleted'}), 400
+            
+            project_name = project.name
+            
+            # Permanently delete the project (cascade will handle related records)
+            db.session.delete(project)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Project "{project_name}" has been permanently deleted',
+                'project_id': project_id
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)})
+
+    # ========================================
+    # ASSUMPTIONS ANALYSIS API ENDPOINTS
+    # ========================================
+
+    @app.route('/api/project/<project_id>/assumptions-analysis', methods=['POST'])
+    @login_required
+    def trigger_assumptions_analysis(project_id):
+        """Trigger assumptions analysis for a project"""
+        try:
+            from enhanced_orchestrator import get_enhanced_orchestrator
+            
+            # Get analysis type from request
+            data = request.get_json() or {}
+            analysis_type = data.get('analysis_type', 'full')  # 'full', 'assumptions_only', 'recommendations_only'
+            
+            # Validate project exists and user has access
+            from models import User, Project
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found or access denied'}), 404
+            
+            # Trigger assumptions analysis
+            orchestrator = get_enhanced_orchestrator()
+            task_id = orchestrator.trigger_assumptions_analysis(int(project_id), analysis_type)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Assumptions analysis started for project {project_id}',
+                'task_id': task_id,
+                'analysis_type': analysis_type,
+                'project_id': project_id
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/project/<project_id>/assumptions-analysis/results')
+    @login_required
+    def get_assumptions_analysis_results(project_id):
+        """Get assumptions analysis results for a project"""
+        try:
+            from models import User, AssumptionAnalysis
+            
+            # Validate project access
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found or access denied'}), 404
+            
+            # Get latest analysis results
+            latest_analysis = AssumptionAnalysis.query.filter_by(
+                project_id=project_id
+            ).order_by(AssumptionAnalysis.generated_at.desc()).first()
+            
+            if not latest_analysis:
+                return jsonify({
+                    'success': False,
+                    'error': 'No assumptions analysis found for this project'
+                }), 404
+            
+            # Mark as viewed
+            latest_analysis.mark_viewed()
+            db.session.commit()
+            
+            # Get related assumptions and recommendations
+            assumptions = [assumption.to_dict() for assumption in latest_analysis.assumptions]
+            recommendations = [rec.to_dict() for rec in latest_analysis.recommendations]
+            
+            return jsonify({
+                'success': True,
+                'analysis': latest_analysis.to_dict(),
+                'raw_analysis': latest_analysis.raw_analysis,
+                'assumptions': assumptions,
+                'recommendations': recommendations,
+                'summary': {
+                    'total_assumptions': len(assumptions),
+                    'total_recommendations': len(recommendations),
+                    'high_impact_assumptions': len([a for a in assumptions if a.get('impact_level') == 'high']),
+                    'high_priority_recommendations': len([r for r in recommendations if r.get('priority_level') == 'high'])
+                }
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/assumptions/<assumption_id>/update', methods=['PUT'])
+    @login_required
+    def update_assumption(assumption_id):
+        """Update an assumption (validation status, user notes, etc.)"""
+        try:
+            from models import ProjectAssumption
+            
+            assumption = ProjectAssumption.query.get(assumption_id)
+            if not assumption:
+                return jsonify({'success': False, 'error': 'Assumption not found'}), 404
+            
+            # Validate user has access to project
+            from models import User
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=assumption.project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            data = request.get_json()
+            
+            # Update allowed fields
+            if 'validation_status' in data:
+                assumption.validation_status = data['validation_status']
+            if 'validation_notes' in data:
+                assumption.validation_notes = data['validation_notes']
+            if 'user_notes' in data:
+                assumption.user_notes = data['user_notes']
+            if 'user_priority' in data:
+                assumption.user_priority = data['user_priority']
+            if 'status' in data:
+                assumption.status = data['status']
+                if data['status'] == 'resolved':
+                    assumption.resolved_at = datetime.utcnow()
+                    assumption.resolved_by = user.id
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Assumption updated successfully',
+                'assumption': assumption.to_dict()
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/recommendations/<recommendation_id>/update', methods=['PUT'])
+    @login_required
+    def update_recommendation(recommendation_id):
+        """Update a recommendation (decision, status, etc.)"""
+        try:
+            from models import AIRecommendation
+            
+            recommendation = AIRecommendation.query.get(recommendation_id)
+            if not recommendation:
+                return jsonify({'success': False, 'error': 'Recommendation not found'}), 404
+            
+            # Validate user has access to project
+            from models import User
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=recommendation.project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            data = request.get_json()
+            
+            # Update allowed fields
+            if 'status' in data:
+                recommendation.status = data['status']
+                if data['status'] in ['accepted', 'rejected']:
+                    recommendation.decision_maker = user.id
+                    recommendation.decision_date = datetime.utcnow()
+            if 'decision_notes' in data:
+                recommendation.decision_notes = data['decision_notes']
+            if 'implementation_status' in data:
+                recommendation.implementation_status = data['implementation_status']
+                if data['implementation_status'] == 'completed':
+                    recommendation.completion_date = datetime.utcnow()
+            if 'implementation_notes' in data:
+                recommendation.implementation_notes = data['implementation_notes']
+            if 'user_rating' in data:
+                recommendation.user_rating = data['user_rating']
+            if 'user_feedback' in data:
+                recommendation.user_feedback = data['user_feedback']
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Recommendation updated successfully',
+                'recommendation': recommendation.to_dict()
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/task/<task_id>/status')
+    @login_required
+    def get_analysis_task_status(task_id):
+        """Get status of an analysis task"""
+        try:
+            from enhanced_orchestrator import get_enhanced_orchestrator
+            
+            orchestrator = get_enhanced_orchestrator()
+            status = orchestrator.get_analysis_status(task_id)
+            
+            return jsonify(status)
+            
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    @app.route('/test-redis')
-    def test_redis():
-        """Test Redis connection"""
+    @app.route('/assumptions')
+    @login_required
+    def assumptions_page():
+        """Page for viewing project assumptions analysis"""
         try:
-            import redis
-            redis_url = app.config.get('REDIS_URL') or os.getenv('REDIS_URL')
-            if redis_url:
-                r = redis.from_url(redis_url)
-                r.ping()
-                return jsonify({'redis': 'connected', 'url': redis_url, 'status': 'success'})
-            else:
-                return jsonify({'redis': 'not_configured', 'status': 'warning'})
+            # Get project_id from query params
+            project_id = request.args.get('project_id')
+            if not project_id:
+                flash('Project ID is required', 'error')
+                return redirect('/projects')
+            
+            # Validate project access
+            from models import User
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                flash('Project not found or access denied', 'error')
+                return redirect('/projects')
+            
+            return render_template('assumptions_analysis.html', 
+                                 project=project,
+                                 project_id=project_id)
+                                 
         except Exception as e:
-            return jsonify({'redis': 'error', 'message': str(e), 'status': 'failed'}), 500
+            flash(f'Error loading assumptions page: {e}', 'error')
+            return redirect('/projects')
 
-    # Register enhanced routes if available
-    try:
-        from app import create_enhanced_routes
-        create_enhanced_routes(app, db, app.config.get('DOCUMENT_PROCESSOR'))
-        print("✅ Enhanced multi-document routes registered")
-    except Exception as e:
-        print(f"⚠️ Enhanced routes not available: {e}")
+    # ========================================
+    # PROPOSAL TEMPLATE MANAGEMENT API ENDPOINTS
+    # ========================================
+
+    @app.route('/api/templates/upload', methods=['POST'])
+    @login_required
+    def upload_proposal_template():
+        """Upload a DOCX/PPTX proposal template"""
+        try:
+            from template_processor import get_template_processor
+            from models import User
+            
+            # Validate user
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+            
+            # Check file upload
+            if 'template_file' not in request.files:
+                return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+            
+            file = request.files['template_file']
+            if file.filename == '':
+                return jsonify({'success': False, 'error': 'No file selected'}), 400
+            
+            # Validate file type
+            allowed_extensions = {'.docx', '.pptx'}
+            file_extension = os.path.splitext(file.filename.lower())[1]
+            if file_extension not in allowed_extensions:
+                return jsonify({
+                    'success': False, 
+                    'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
+                }), 400
+            
+            # Get template metadata
+            template_info = {
+                'name': request.form.get('name', file.filename),
+                'description': request.form.get('description', ''),
+                'category': request.form.get('category', 'general'),
+                'is_default': request.form.get('is_default', 'false').lower() == 'true'
+            }
+            
+            # Save uploaded file
+            upload_dir = os.path.join('uploads', 'templates')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            safe_filename = f"{timestamp}_{file.filename}"
+            file_path = os.path.join(upload_dir, safe_filename)
+            file.save(file_path)
+            
+            # Process template
+            template_processor = get_template_processor()
+            result = template_processor.process_template_upload(
+                file_path=file_path,
+                original_filename=file.filename,
+                template_info=template_info,
+                user_id=user.id
+            )
+            
+            if result['success']:
+                return jsonify({
+                    'success': True,
+                    'message': result['message'],
+                    'template_id': result['template_id'],
+                    'bookmarks_found': result['bookmarks_found'],
+                    'bookmarks': result['bookmarks']
+                })
+            else:
+                # Clean up file if processing failed
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return jsonify({
+                    'success': False,
+                    'error': result['error']
+                }), 400
+                
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/templates')
+    @login_required
+    def get_proposal_templates():
+        """Get all available proposal templates"""
+        try:
+            from models import ProposalTemplate
+            
+            category = request.args.get('category')
+            template_type = request.args.get('type')  # 'docx', 'pptx'
+            
+            query = ProposalTemplate.query.filter_by(is_active=True)
+            
+            if category:
+                query = query.filter_by(category=category)
+            if template_type:
+                query = query.filter_by(template_type=template_type)
+            
+            templates = query.order_by(ProposalTemplate.usage_count.desc()).all()
+            
+            return jsonify({
+                'success': True,
+                'templates': [template.to_dict() for template in templates],
+                'count': len(templates)
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/templates/<template_id>')
+    @login_required
+    def get_template_details(template_id):
+        """Get detailed information about a specific template"""
+        try:
+            from models import ProposalTemplate, TemplateBookmark
+            
+            template = ProposalTemplate.query.filter_by(template_id=template_id).first()
+            if not template:
+                return jsonify({'success': False, 'error': 'Template not found'}), 404
+            
+            bookmarks = TemplateBookmark.query.filter_by(template_id=template.id).all()
+            
+            return jsonify({
+                'success': True,
+                'template': template.to_dict(),
+                'bookmarks': [bookmark.to_dict() for bookmark in bookmarks]
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/templates/<template_id>/bookmarks/<bookmark_id>', methods=['PUT'])
+    @login_required
+    def update_template_bookmark(template_id, bookmark_id):
+        """Update template bookmark configuration"""
+        try:
+            from models import TemplateBookmark
+            
+            bookmark = TemplateBookmark.query.filter_by(bookmark_id=bookmark_id).first()
+            if not bookmark:
+                return jsonify({'success': False, 'error': 'Bookmark not found'}), 404
+            
+            data = request.get_json()
+            
+            # Update allowed fields
+            if 'display_name' in data:
+                bookmark.display_name = data['display_name']
+            if 'description' in data:
+                bookmark.description = data['description']
+            if 'content_type' in data:
+                bookmark.content_type = data['content_type']
+            if 'content_source' in data:
+                bookmark.content_source = data['content_source']
+            if 'default_content' in data:
+                bookmark.default_content = data['default_content']
+            if 'ai_prompt_template' in data:
+                bookmark.ai_prompt_template = data['ai_prompt_template']
+            if 'is_required' in data:
+                bookmark.is_required = data['is_required']
+            if 'max_length' in data:
+                bookmark.max_length = data['max_length']
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Bookmark updated successfully',
+                'bookmark': bookmark.to_dict()
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/project/<project_id>/proposal/generate', methods=['POST'])
+    @login_required
+    def generate_project_proposal():
+        """Generate proposal for project using template or AI-only"""
+        try:
+            from enhanced_proposal_generator import create_enhanced_proposal_generator
+            from models import User
+            
+            # Validate user and project
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found or access denied'}), 404
+            
+            data = request.get_json() or {}
+            
+            # Extract generation parameters
+            deliverable_type = data.get('deliverable_type', 'technical')
+            template_id = data.get('template_id')  # None for AI-only generation
+            output_format = data.get('output_format', 'docx')
+            detail_level = data.get('detail_level', 'standard')
+            custom_content = data.get('custom_content', {})
+            
+            # Company information
+            company_info = data.get('company_info', {
+                'name': data.get('company_name', 'Your Company'),
+                'contact_person': data.get('contact_person', 'Project Manager'),
+                'address': data.get('company_address', ''),
+                'phone': data.get('company_phone', ''),
+                'email': data.get('company_email', ''),
+                'website': data.get('company_website', '')
+            })
+            
+            # Create enhanced proposal generator
+            generator = create_enhanced_proposal_generator(
+                project=project,
+                company_name=company_info.get('name', 'Your Company'),
+                contact_person=company_info.get('contact_person', 'Project Manager')
+            )
+            
+            # Update company information
+            generator.update_company_info(company_info)
+            
+            # Generate proposal
+            if template_id:
+                # Template-based generation
+                result = generator.generate_with_template(
+                    template_id=int(template_id),
+                    deliverable_type=deliverable_type,
+                    custom_content=custom_content,
+                    detail_level=detail_level
+                )
+            else:
+                # AI-only generation
+                result = generator.generate_without_template(
+                    deliverable_type=deliverable_type,
+                    output_format=output_format,
+                    detail_level=detail_level
+                )
+            
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'message': 'Proposal generated successfully',
+                    **result
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': result.get('error', 'Generation failed')
+                }), 500
+                
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/project/<project_id>/proposal/package', methods=['POST'])
+    @login_required
+    def generate_proposal_package():
+        """Generate multiple proposal documents as a package"""
+        try:
+            from enhanced_proposal_generator import create_enhanced_proposal_generator
+            from models import User
+            
+            # Validate user and project
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            if not project:
+                return jsonify({'success': False, 'error': 'Project not found'}), 404
+            
+            data = request.get_json() or {}
+            
+            # Extract parameters
+            deliverable_types = data.get('deliverable_types', ['technical', 'commercial'])
+            template_preferences = data.get('template_preferences', {})
+            output_format = data.get('output_format', 'docx')
+            detail_level = data.get('detail_level', 'standard')
+            company_info = data.get('company_info', {})
+            
+            # Create generator
+            generator = create_enhanced_proposal_generator(project=project)
+            if company_info:
+                generator.update_company_info(company_info)
+            
+            # Generate package
+            result = generator.generate_proposal_package(
+                deliverable_types=deliverable_types,
+                template_preferences=template_preferences,
+                output_format=output_format,
+                detail_level=detail_level
+            )
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/proposal-templates')
+    @login_required
+    def proposal_templates_page():
+        """Template management page"""
+        try:
+            return render_template('proposal_templates.html')
+        except Exception as e:
+            flash(f'Error loading templates page: {e}', 'error')
+            return redirect('/')
+
+    @app.route('/api/templates/<template_id>/delete', methods=['DELETE'])
+    @login_required
+    def delete_proposal_template(template_id):
+        """Delete a proposal template"""
+        try:
+            from models import ProposalTemplate, User
+            
+            user = User.query.filter_by(username=session['username']).first()
+            template = ProposalTemplate.query.filter_by(template_id=template_id).first()
+            
+            if not template:
+                return jsonify({'success': False, 'error': 'Template not found'}), 404
+            
+            # Check if user has permission (owner or admin)
+            if template.uploaded_by != user.id and user.role != 'admin':
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            # Delete file
+            if os.path.exists(template.file_path):
+                os.remove(template.file_path)
+            
+            # Delete from database (cascade will handle bookmarks)
+            db.session.delete(template)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Template deleted successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     return app
 
@@ -3565,13 +3480,9 @@ def create_celery():
             timezone='UTC',
             enable_utc=True,
             result_expires=3600,
-            imports=['tasks'],  # Import tasks module
-            include=['tasks'],  # Include tasks module
+            imports=['tasks'],
+            include=['tasks'],
         )
-
-        @celery.task
-        def test_task():
-            return "Celery is working!"
 
         print("✅ Celery configured successfully")
         return celery
@@ -3592,7 +3503,7 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_ENV') == 'development'
 
     print("\n" + "="*60)
-    print("🚀 TENDER ANALYSIS SYSTEM - FULL FUNCTIONALITY")
+    print("🚀 TENDER ANALYSIS SYSTEM - PURE PYTHON VERSION")
     print("="*60)
     print(f"📊 Dashboard: http://localhost:{port}")
     print(f"🔐 Login: admin / admin123")
@@ -3600,17 +3511,7 @@ if __name__ == '__main__':
     print(f"🔧 Debug Mode: {'ON' if debug else 'OFF'}")
     print(f"💾 Database: {os.getenv('DATABASE_URL', 'Local PostgreSQL')}")
     print(f"🔴 Redis: {os.getenv('REDIS_URL', 'Local Redis')}")
-    print(f"🤖 AI Processing: {'ENABLED' if os.getenv('ANTHROPIC_API_KEY') else 'DISABLED'}")
-    print("="*60)
-    print("✅ Available Features:")
-    print("  🔐 User Authentication & Session Management")
-    print("  📁 Project Management with Multi-Document Support")
-    print("  📄 Document Upload with Drag & Drop")
-    print("  🤖 AI-Powered Document Analysis")
-    print("  📊 Requirements Extraction & Analysis")
-    print("  📋 Project Dashboards & Detailed Views")
-    print("  🔍 Document-Level Analysis & Insights")
-    print("  📝 Proposal Generation Interface")
+    print(f"🤖 AI Processing: {'ENABLED' if os.getenv('ANTHROPIC_API_KEY') or os.getenv('OPENAI_API_KEY') else 'DISABLED'}")
     print("="*60)
 
     try:

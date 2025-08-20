@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Analysis - {{ doc_analysis.filename }}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/itss-theme.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #1F4397;
+        }
+        .requirement {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+        }
+        .term-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .btn {
+            background: #1F4397;
+            border: none;
+        }
+        .btn:hover {
+            background: #10224c;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>ITSS RFPplus
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/projects">Projects</a>
+                <a class="nav-link" href="/project/{{ project.id }}">{{ project.name }}</a>
+                <a class="nav-link" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1><i class="fas fa-file-alt me-2"></i>Document Analysis</h1>
+                <p class="text-muted">{{ doc_analysis.filename }}</p>
+            </div>
+            <div>
+                <a href="/project/{{ project.id }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Project
+                </a>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <h3><i class="fas fa-info-circle me-2"></i>Document Information</h3>
+            <p><strong>File Size:</strong> {{ doc_analysis.file_size }}</p>
+            <p><strong>Upload Date:</strong> {{ doc_analysis.upload_date }}</p>
+            <p><strong>Analysis Confidence:</strong> {{ doc_analysis.analysis_confidence }}</p>
+            <p><strong>Project:</strong> {{ project.name }}</p>
+        </div>
+
+        <div class="info-card">
+            <h3><i class="fas fa-bullseye me-2"></i>Extracted Requirements</h3>
+            {% if doc_analysis.extracted_requirements %}
+                {% for req in doc_analysis.extracted_requirements %}
+                <div class="requirement">{{ req }}</div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No requirements extracted yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="info-card">
+            <h3><i class="fas fa-search me-2"></i>Key Terms Identified</h3>
+            {% if doc_analysis.key_terms %}
+                {% for term in doc_analysis.key_terms %}
+                <span class="term-tag">{{ term }}</span>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No key terms identified yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="info-card">
+            <h3><i class="fas fa-check-circle me-2"></i>Compliance Items</h3>
+            {% if doc_analysis.compliance_items %}
+                {% for item in doc_analysis.compliance_items %}
+                <div class="requirement">{{ item }}</div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">No compliance items identified yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="/analysis/{{ project.id }}" class="btn btn-success">
+                <i class="fas fa-chart-bar me-2"></i>View Full Project Analysis
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

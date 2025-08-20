@@ -22,14 +22,14 @@ gunicorn==21.2.0
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.25
 
-# Document processing (Latest)
+# Document processing (Essential only)
 PyPDF2==3.0.1
 python-docx==1.1.0
-pytesseract==0.3.10
-Pillow==10.2.0
 openpyxl==3.1.2
-python-magic==0.4.27
-weasyprint>=59.0  # Optional for PDF generation
+Pillow==10.2.0  # Image processing - needed for document processor
+# pytesseract==0.3.10  # Heavy OCR - commented out for minimal build
+# python-magic==0.4.27  # Not essential
+# weasyprint>=59.0  # Heavy PDF generation - commented out
 
 # Security and utilities (Latest)
 Werkzeug==3.0.1
@@ -44,11 +44,28 @@ python-dotenv==1.0.0
 anthropic==0.57.1
 openai==1.98.0
 
+# LangChain and Vector Database (LIGHTWEIGHT)
+# Heavy packages commented out to reduce image size from 8GB to ~1GB
+# sentence-transformers==2.3.1  # This alone is ~2GB
+# faiss-cpu==1.8.0  # Another ~500MB
+# langchain==0.1.20  # Full package is heavy
+# langchain-community==0.0.38  # Heavy dependencies
+
+# Minimal vector support (only if DATABASE_URL includes pgvector)
+# Commented out for minimal build - uncomment if vector features needed
+# langchain-core==0.1.52
+# langchain-openai==0.1.8
+# pgvector>=0.2.5,<0.3.0
+
+# Lightweight fallback for similarity search
+scikit-learn==1.3.0
+numpy==1.24.3
+
 #python-magic-bin
-mammoth==1.5.1  # For advanced DOCX processing
-textract==1.6.5  # Alternative text extraction
+# mammoth==1.5.1  # For advanced DOCX processing - commented for minimal build
+# textract==1.6.5  # Alternative text extraction - heavy package
 #pdfplumber==0.9.0  # Better PDF text extraction
-pdfplumber
+# pdfplumber  # Commented for minimal build
 
 # File handling
 filetype==1.2.0

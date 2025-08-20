@@ -1,0 +1,193 @@
+CREATE_PROJECT_TEMPLATE = '''
+{% extends "base.html" %}
+
+{% block title %}Create New Project - AI Tender Analysis{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-plus-circle me-2"></i>Create New RFP Project</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="project_name" class="form-label">Project Name *</label>
+                            <input type="text" class="form-control" id="project_name" name="project_name" required>
+                            <div class="form-text">Enter a descriptive name for this RFP project</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="client_name" class="form-label">Client Name</label>
+                            <input type="text" class="form-control" id="client_name" name="client_name">
+                            <div class="form-text">Name of the organization issuing the RFP</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Project Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+                            <div class="form-text">Brief description of the project scope and objectives</div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Create Project
+                            </button>
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+'''
+
+# Template: project_dashboard.html
+PROJECT_DASHBOARD_TEMPLATE = '''
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - Project Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">{{ project.name }}</h1>
+                    <p class="text-muted">{{ project.client_name or 'No client specified' }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('upload_documents', project_id=project.id) }}" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload Documents
+                    </a>
+                    <a href="{{ url_for('export_markdown', project_id=project.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ documents_count }}</h3>
+                    <p class="mb-0">Documents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>{{ key_points_count }}</h3>
+                    <p class="mb-0">Key Points</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h3>{{ conflicts_count }}</h3>
+                    <p class="mb-0">Conflicts</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3>{{ missing_info_count }}</h3>
+                    <p class="mb-0">Missing Info</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quick Actions -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-tasks me-2"></i>Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('view_key_points', project_id=project.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-list me-2"></i>View Key Points
+                        </a>
+                        <a href="{{ url_for('view_conflicts', project_id=project.id) }}" class="btn btn-outline-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Review Conflicts
+                        </a>
+                        <a href="{{ url_for('view_missing_info', project_id=project.id) }}" class="btn btn-outline-danger">
+                            <i class="fas fa-question-circle me-2"></i>Missing Information
+                        </a>
+                        <button class="btn btn-outline-secondary" onclick="reprocessProject()">
+                            <i class="fas fa-sync me-2"></i>Reprocess All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Documents -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-file-alt me-2"></i>Recent Documents</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_documents %}
+                        {% for doc in recent_documents %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>{{ doc.original_name }}</strong><br>
+                                <small class="text-muted">{{ doc.document_type.replace('_', ' ').title() }}</small>
+                            </div>
+                            <span class="badge bg-{{ 'success' if doc.processing_status == 'completed' else 'warning' }}">
+                                {{ doc.processing_status.title() }}
+                            </span>
+                        </div>
+                        {% if not loop.last %}<hr>{% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No documents uploaded yet.</p>
+                        <a href="{{ url_for('upload_documents', project_id=project.id) }}" class="btn btn-primary">
+                            Upload First Document
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function reprocessProject() {
+    if (confirm('This will reprocess all documents and may take some time. Continue?')) {
+        try {
+            const response = await fetch(`/api/projects/{{ project.id }}/reprocess`);
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('Project reprocessed successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error reprocessing project: ' + error.message);
+        }
+    }
+}
+</script>
+{% endblock %}
+'''

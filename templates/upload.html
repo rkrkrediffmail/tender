@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Documents - ITSS RFPplus</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/itss-theme.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f5f5f5;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 50px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #1F4397;
+            background: #f8f9ff;
+        }
+        .upload-area.dragover {
+            border-color: #1F4397;
+            background: #e3f2fd;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #1F4397;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #10224c;
+            color: white;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .file-list {
+            margin: 20px 0;
+        }
+        .file-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .info-box {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #1F4397;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>ITSS RFPplus
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/projects">Projects</a>
+                <a class="nav-link active" href="/upload">Upload</a>
+                <a class="nav-link" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1><i class="fas fa-upload me-3"></i>Upload RFP Documents</h1>
+                <p class="text-muted">Upload your tender/RFP documents for AI-powered analysis</p>
+
+                <div class="info-box">
+                    <h4>🤖 What Our AI Will Do</h4>
+                    <p>Our AI will automatically:</p>
+                    <ul>
+                        <li>Extract key requirements and specifications</li>
+                        <li>Categorize requirements by priority (Must Have, Good to Have)</li>
+                        <li>Identify compliance and technical constraints</li>
+                        <li>Highlight clarification items that need attention</li>
+                        <li>Assess risks and constraints affecting cashflow</li>
+                        <li>Extract deadlines, milestones, and penalties</li>
+                        <li>Generate proposal recommendations</li>
+                    </ul>
+                </div>
+
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="project_id" class="form-label"><strong>Select Project:</strong></label>
+                        <select id="project_id" name="project_id" class="form-select" required>
+                            <option value="">Choose a project...</option>
+                            {% for project in user_projects %}
+                            <option value="{{ project.id }}" {% if project_id == project.id|string %}selected{% endif %}>
+                                {{ project.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not user_projects %}
+                        <div class="alert alert-warning mt-2">
+                            ⚠️ No projects found. <a href="/create_project">Create a project first</a>.
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="upload-area" id="uploadArea">
+                        <h3><i class="fas fa-cloud-upload-alt me-2"></i>Drop files here or click to upload</h3>
+                        <p>Supported formats: PDF, DOCX, TXT, XLSX</p>
+                        <p>Maximum file size: 50MB</p>
+                        <input type="file" id="fileInput" name="files" multiple accept=".pdf,.docx,.txt,.xlsx,.doc,.xls" style="display: none;">
+                        <button type="button" onclick="document.getElementById('fileInput').click()" class="btn">
+                            <i class="fas fa-folder-open me-2"></i>Choose Files
+                        </button>
+                    </div>
+
+                    <div id="fileList" class="file-list"></div>
+
+                    <div id="progress" class="progress">
+                        <div id="progressBar" class="progress-bar"></div>
+                    </div>
+
+                    <button type="submit" class="btn" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 20px;" disabled id="uploadBtn">
+                        🚀 Start AI Analysis
+                    </button>
+                </form>
+
+                <div id="results" class="results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const projectSelect = document.getElementById('project_id');
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+        });
+
+        projectSelect.addEventListener('change', updateUploadButton);
+
+        function addFiles(files) {
+            files.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name)) {
+                    selectedFiles.push(file);
+                }
+            });
+            updateFileList();
+            updateUploadButton();
+        }
+
+        function removeFile(fileName) {
+            selectedFiles = selectedFiles.filter(f => f.name !== fileName);
+            updateFileList();
+            updateUploadButton();
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div>
+                        <i class="fas fa-file me-2"></i>
+                        <strong>${file.name}</strong>
+                        <small class="text-muted ms-2">(${(file.size / 1024 / 1024).toFixed(2)} MB)</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFile('${file.name}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function updateUploadButton() {
+            const hasFiles = selectedFiles.length > 0;
+            const hasProject = projectSelect.value !== '';
+            uploadBtn.disabled = !(hasFiles && hasProject);
+        }
+
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const projectId = projectSelect.value;
+            if (!projectId) {
+                alert('Please select a project first.');
+                return;
+            }
+
+            if (selectedFiles.length === 0) {
+                alert('Please select files to upload.');
+                return;
+            }
+
+            uploadBtn.textContent = '📤 Uploading Files...';
+            uploadBtn.disabled = true;
+            progress.style.display = 'block';
+
+            let uploadedDocuments = [];
+            let hasErrors = false;
+
+            // Upload files one by one
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('project_id', projectId);
+
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin',
+                        cache: 'no-cache'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        progressBar.style.width = ((i + 1) / selectedFiles.length * 100) + '%';
+                        uploadedDocuments.push({
+                            documentId: result.document_id,
+                            filename: result.filename,
+                            taskId: result.task_id
+                        });
+                    } else {
+                        alert(`Error uploading ${file.name}: ${result.error}`);
+                        hasErrors = true;
+                    }
+                } catch (error) {
+                    alert(`Network error uploading ${file.name}: ${error.message}`);
+                    hasErrors = true;
+                }
+            }
+
+            // Continue with post-analysis if we have successful uploads
+            if (uploadedDocuments.length > 0) {
+                uploadBtn.textContent = '📄 Processing Documents...';
+
+                // Redirect to post-analysis page
+                setTimeout(() => {
+                    window.location.href = `/post_analysis/${projectId}`;
+                }, 2000);
+            } else {
+                uploadBtn.textContent = '🚀 Start AI Analysis';
+                uploadBtn.disabled = false;
+                progress.style.display = 'none';
+
+                if (hasErrors) {
+                    alert('All uploads failed. Please check your files and try again.');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

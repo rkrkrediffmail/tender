@@ -68,6 +68,90 @@ class ProposalGenerator:
             'format': output_format,
             'size': self._get_file_size(filename),
             'download_url': f'/download-proposal/{filename}',
+            'filepath': os.path.join(self.output_dir, filename),
+            'generated_at': doc_info['generated_at']
+        }
+
+    def generate_custom_document(self, custom_deliverable, output_format: str = 'pdf', detail_level: str = 'standard') -> Dict[str, Any]:
+        """Generate a document based on custom deliverable template"""
+        
+        if not self.client:
+            content = self._fallback_custom_document(custom_deliverable)
+        else:
+            # Replace placeholders in the prompt template
+            prompt_template = custom_deliverable.prompt_template or ""
+            
+            # Available placeholders
+            placeholders = {
+                'project_name': self.project.name,
+                'client_name': self.client_name,
+                'company_name': self.company_name,
+                'contact_person': self.contact_person,
+                'requirements': self._format_requirements(),
+                'analysis_summary': self._format_analysis_summary(),
+                'key_constraints': self._format_constraints(),
+                'project_details': self._format_project_details()
+            }
+            
+            # Replace placeholders in template
+            formatted_prompt = prompt_template
+            for placeholder, value in placeholders.items():
+                formatted_prompt = formatted_prompt.replace('{' + placeholder + '}', str(value))
+            
+            # Add detail level instructions
+            detail_instructions = {
+                'executive': "Keep the response concise and executive-focused (5-10 pages).",
+                'standard': "Provide a comprehensive response with good detail (10-15 pages).",
+                'comprehensive': "Provide an extremely detailed and thorough response (15+ pages)."
+            }
+            
+            full_prompt = f"""
+            {formatted_prompt}
+            
+            **Instructions:**
+            - {detail_instructions.get(detail_level, detail_instructions['standard'])}
+            - Format as professional business document with clear sections
+            - Use markdown formatting for structure
+            - Include specific examples and recommendations where applicable
+            - Ensure all content is relevant to the project context provided
+            """
+            
+            try:
+                response = self.client.messages.create(
+                    model="claude-3-sonnet-20240229",
+                    max_tokens=4000,
+                    messages=[{"role": "user", "content": full_prompt}]
+                )
+                content = response.content[0].text
+            except Exception as e:
+                print(f"AI generation failed: {e}")
+                content = self._fallback_custom_document(custom_deliverable)
+
+        # Create document metadata
+        doc_info = {
+            'title': custom_deliverable.title,
+            'description': custom_deliverable.description,
+            'type': f'custom_{custom_deliverable.id}',
+            'content': content,
+            'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'project_id': self.project.id,
+            'project_name': self.project.name,
+            'company_name': self.company_name,
+            'contact_person': self.contact_person
+        }
+
+        # Save document  
+        filename = self._save_document(doc_info, output_format)
+
+        # Return download info
+        return {
+            'title': doc_info['title'],
+            'description': doc_info['description'],
+            'filename': filename,
+            'format': output_format,
+            'size': self._get_file_size(filename),
+            'download_url': f'/download-proposal/{filename}',
+            'filepath': os.path.join(self.output_dir, filename),
             'generated_at': doc_info['generated_at']
         }
 
@@ -963,3 +1047,98 @@ We commit to meeting all {len(self.analysis_results.get('must_have_requirements'
 
 Note: AI analysis service not available. This is a basic template. Please configure ANTHROPIC_API_KEY for detailed AI-generated proposals.
 """
+
+    def _fallback_custom_document(self, custom_deliverable) -> str:
+        """Generate fallback content for custom deliverable when AI is not available"""
+        return f"""
+# {custom_deliverable.title}
+## For {self.project.name}
+
+### 1. DOCUMENT OVERVIEW
+This is a custom deliverable created for {self.project.name} by {self.company_name}.
+
+### 2. PROJECT CONTEXT
+- **Project:** {self.project.name}
+- **Client:** {self.client_name}
+- **Contact:** {self.contact_person}
+
+### 3. CONTENT
+{custom_deliverable.description}
+
+Note: AI analysis service not available. This is a basic template. Please configure ANTHROPIC_API_KEY for detailed AI-generated custom deliverables using your prompt template:
+
+**Your Template:**
+{custom_deliverable.prompt_template or 'No template defined'}
+"""
+
+    def _format_requirements(self) -> str:
+        """Format requirements for template replacement"""
+        must_have = self.analysis_results.get('must_have_requirements', [])
+        good_to_have = self.analysis_results.get('good_to_have_requirements', [])
+        
+        formatted = []
+        if must_have:
+            formatted.append("**Must-Have Requirements:**")
+            formatted.extend([f"• {req}" for req in must_have])
+        
+        if good_to_have:
+            formatted.append("\n**Good-to-Have Requirements:**")
+            formatted.extend([f"• {req}" for req in good_to_have])
+        
+        return "\n".join(formatted) if formatted else "No specific requirements identified."
+
+    def _format_analysis_summary(self) -> str:
+        """Format analysis summary for template replacement"""
+        summary_parts = []
+        
+        if self.analysis_results.get('must_have_requirements'):
+            summary_parts.append(f"{len(self.analysis_results['must_have_requirements'])} must-have requirements identified")
+        
+        if self.analysis_results.get('technical_specifications'):
+            summary_parts.append(f"{len(self.analysis_results['technical_specifications'])} technical specifications")
+        
+        if self.analysis_results.get('project_details'):
+            details = self.analysis_results['project_details']
+            if details.get('timeline'):
+                summary_parts.append(f"Timeline: {details['timeline']}")
+            if details.get('budget'):
+                summary_parts.append(f"Budget: {details['budget']}")
+        
+        return "; ".join(summary_parts) if summary_parts else "Analysis completed for project requirements."
+
+    def _format_constraints(self) -> str:
+        """Format key constraints for template replacement"""
+        constraints = []
+        
+        # Add any constraints from analysis results
+        if self.analysis_results.get('constraints'):
+            constraints.extend(self.analysis_results['constraints'])
+        
+        # Add timeline constraints
+        project_details = self.analysis_results.get('project_details', {})
+        if project_details.get('timeline'):
+            constraints.append(f"Timeline constraint: {project_details['timeline']}")
+        
+        if project_details.get('budget'):
+            constraints.append(f"Budget constraint: {project_details['budget']}")
+        
+        return "\n".join([f"• {constraint}" for constraint in constraints]) if constraints else "No specific constraints identified."
+
+    def _format_project_details(self) -> str:
+        """Format project details for template replacement"""
+        details = self.analysis_results.get('project_details', {})
+        formatted = []
+        
+        if details.get('timeline'):
+            formatted.append(f"**Timeline:** {details['timeline']}")
+        
+        if details.get('budget'):
+            formatted.append(f"**Budget:** {details['budget']}")
+        
+        if details.get('evaluation_criteria'):
+            formatted.append(f"**Evaluation Criteria:** {details['evaluation_criteria']}")
+        
+        if details.get('key_stakeholders'):
+            formatted.append(f"**Key Stakeholders:** {details['key_stakeholders']}")
+        
+        return "\n".join(formatted) if formatted else "Standard project details apply."

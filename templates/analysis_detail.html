@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/itss-theme.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Details - {{ project.name }}</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 20px;
+        }
+        .analysis-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+        }
+        .meta-item {
+            text-align: center;
+        }
+        .meta-label {
+            font-size: 0.8em;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .meta-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .section-header {
+            background: #007bff;
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .section-content {
+            padding: 20px;
+        }
+        .item-list {
+            list-style: none;
+            padding: 0;
+        }
+        .item-list li {
+            background: #f8f9fa;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .priority-high { border-left-color: #dc3545; }
+        .priority-medium { border-left-color: #ffc107; }
+        .priority-low { border-left-color: #28a745; }
+        .priority-critical { border-left-color: #6f42c1; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: bold;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn:hover { opacity: 0.9; }
+        .recommendation-box {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .recommendation-decision {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .feedback-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 30px;
+        }
+        .rating-stars {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        .star {
+            font-size: 1.5em;
+            color: #ddd;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .star.active, .star:hover {
+            color: #ffc107;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: bold;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .export-options {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e9ecef;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>AI Analysis Details</h1>
+                <p><strong>Project:</strong> {{ project.name }}</p>
+                <p><strong>Analysis ID:</strong> {{ analysis.analysis_id }}</p>
+            </div>
+            <div>
+                <a href="/project/{{ project.id }}/analysis-history" class="btn btn-secondary">← Back to History</a>
+                <a href="/project/{{ project.id }}" class="btn btn-primary">📊 Project Dashboard</a>
+                <button class="btn btn-warning" onclick="rerunAnalysis()">🔄 Re-run Analysis</button>
+            </div>
+        </div>
+
+        <div class="analysis-meta">
+            <div class="meta-item">
+                <div class="meta-label">Created</div>
+                <div class="meta-value">{{ analysis.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Processing Time</div>
+                <div class="meta-value">{{ "%.2f"|format(analysis.processing_time_seconds or 0) }}s</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">AI Model</div>
+                <div class="meta-value">{{ analysis.ai_model_used or 'N/A' }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Views</div>
+                <div class="meta-value">{{ analysis.viewed_count or 0 }}</div>
+            </div>
+        </div>
+
+        {% if analysis.results %}
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('clarification')">Clarifications</div>
+            <div class="tab" onclick="showTab('risks')">Risks & Constraints</div>
+            <div class="tab" onclick="showTab('deadlines')">Deadlines & Milestones</div>
+            <div class="tab" onclick="showTab('recommendation')">Go/No-Go</div>
+        </div>
+
+        <!-- Clarification Items Tab -->
+        <div id="clarification" class="tab-content active">
+            <div class="section">
+                <div class="section-header">
+                    📋 Clarification Items ({{ analysis.results.clarification_items|length if analysis.results.clarification_items else 0 }})
+                </div>
+                <div class="section-content">
+                    {% if analysis.results.clarification_items %}
+                    <ul class="item-list">
+                        {% for item in analysis.results.clarification_items %}
+                        <li class="priority-{{ item.impact_level|lower if item.impact_level else 'medium' }}">
+                            <strong>{{ item.category|replace('_', ' ')|title if item.category else 'General' }}:</strong> 
+                            {{ item.description }}
+                            {% if item.suggested_questions %}
+                            <details style="margin-top: 10px;">
+                                <summary><strong>Suggested Questions</strong></summary>
+                                <ul style="margin: 10px 0;">
+                                    {% for question in item.suggested_questions %}
+                                    <li>{{ question }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>No clarification items identified.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Risks & Constraints Tab -->
+        <div id="risks" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    ⚠️ Risks & Constraints ({{ analysis.results.risks_constraints|length if analysis.results.risks_constraints else 0 }})
+                </div>
+                <div class="section-content">
+                    {% if analysis.results.risks_constraints %}
+                    <ul class="item-list">
+                        {% for item in analysis.results.risks_constraints %}
+                        <li class="priority-{{ item.risk_level|lower if item.risk_level else 'medium' }}">
+                            <strong>{{ item.category|replace('_', ' ')|title if item.category else 'General Risk' }}:</strong> 
+                            {{ item.description }}
+                            {% if item.impact_description %}
+                            <p><strong>Impact:</strong> {{ item.impact_description }}</p>
+                            {% endif %}
+                            {% if item.mitigation_suggestions %}
+                            <details style="margin-top: 10px;">
+                                <summary><strong>Mitigation Suggestions</strong></summary>
+                                <ul style="margin: 10px 0;">
+                                    {% for suggestion in item.mitigation_suggestions %}
+                                    <li>{{ suggestion }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>No risks or constraints identified.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Deadlines & Milestones Tab -->
+        <div id="deadlines" class="tab-content">
+            <div class="section">
+                <div class="section-header">
+                    📅 Deadlines & Milestones ({{ analysis.results.deadlines_milestones|length if analysis.results.deadlines_milestones else 0 }})
+                </div>
+                <div class="section-content">
+                    {% if analysis.results.deadlines_milestones %}
+                    <ul class="item-list">
+                        {% for item in analysis.results.deadlines_milestones %}
+                        <li class="priority-{{ item.priority|lower if item.priority else 'medium' }}">
+                            <strong>{{ item.milestone_type|replace('_', ' ')|title if item.milestone_type else 'Milestone' }}:</strong> 
+                            {{ item.description }}
+                            {% if item.date %}
+                            <p><strong>Date:</strong> {{ item.date }}</p>
+                            {% endif %}
+                            {% if item.dependencies %}
+                            <p><strong>Dependencies:</strong> {{ item.dependencies|join(', ') }}</p>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>No deadlines or milestones identified.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Go/No-Go Recommendation Tab -->
+        <div id="recommendation" class="tab-content">
+            {% if analysis.results.go_no_go_recommendation %}
+            <div class="recommendation-box">
+                <div class="recommendation-decision">
+                    Recommendation: {{ analysis.results.go_no_go_recommendation.decision|upper if analysis.results.go_no_go_recommendation.decision else 'REVIEW REQUIRED' }}
+                </div>
+                {% if analysis.results.go_no_go_recommendation.reasoning %}
+                <p><strong>Reasoning:</strong></p>
+                <p>{{ analysis.results.go_no_go_recommendation.reasoning }}</p>
+                {% endif %}
+                {% if analysis.results.go_no_go_recommendation.key_factors %}
+                <p><strong>Key Decision Factors:</strong></p>
+                <ul>
+                    {% for factor in analysis.results.go_no_go_recommendation.key_factors %}
+                    <li>{{ factor }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if analysis.results.go_no_go_recommendation.next_steps %}
+                <p><strong>Recommended Next Steps:</strong></p>
+                <ul>
+                    {% for step in analysis.results.go_no_go_recommendation.next_steps %}
+                    <li>{{ step }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% else %}
+            <p>No go/no-go recommendation available.</p>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <div class="section">
+            <div class="section-content">
+                <p>No analysis results available.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Feedback Section -->
+        <div class="feedback-section">
+            <h3>Rate This Analysis</h3>
+            <p>How helpful was this AI analysis?</p>
+            <div class="rating-stars" id="ratingStars">
+                <span class="star" data-rating="1">★</span>
+                <span class="star" data-rating="2">★</span>
+                <span class="star" data-rating="3">★</span>
+                <span class="star" data-rating="4">★</span>
+                <span class="star" data-rating="5">★</span>
+            </div>
+            <textarea id="feedbackText" placeholder="Optional feedback..." rows="3" style="width: 100%; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            <button class="btn btn-success" onclick="submitFeedback()">Submit Feedback</button>
+            {% if analysis.user_rating or analysis.user_feedback %}
+            <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 4px;">
+                <strong>Your Previous Feedback:</strong>
+                {% if analysis.user_rating %}<p>Rating: {{ '★' * analysis.user_rating }}{{ '☆' * (5 - analysis.user_rating) }}</p>{% endif %}
+                {% if analysis.user_feedback %}<p>{{ analysis.user_feedback }}</p>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Export Options -->
+        <div class="export-options">
+            <h3>Export Options</h3>
+            <button class="btn btn-primary" onclick="exportAsJSON()">📄 Export as JSON</button>
+            <button class="btn btn-primary" onclick="exportAsPDF()">📑 Export as PDF</button>
+            <button class="btn btn-primary" onclick="exportAsCSV()">📊 Export as CSV</button>
+        </div>
+    </div>
+
+    <script>
+        let currentRating = {{ analysis.user_rating or 0 }};
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Rating system
+        document.querySelectorAll('.star').forEach(star => {
+            star.addEventListener('click', function() {
+                currentRating = parseInt(this.dataset.rating);
+                updateStars();
+            });
+            
+            star.addEventListener('mouseenter', function() {
+                const rating = parseInt(this.dataset.rating);
+                document.querySelectorAll('.star').forEach((s, index) => {
+                    s.classList.toggle('active', index < rating);
+                });
+            });
+        });
+
+        document.getElementById('ratingStars').addEventListener('mouseleave', updateStars);
+
+        function updateStars() {
+            document.querySelectorAll('.star').forEach((star, index) => {
+                star.classList.toggle('active', index < currentRating);
+            });
+        }
+
+        async function submitFeedback() {
+            const feedback = document.getElementById('feedbackText').value;
+            
+            try {
+                const response = await fetch(`/api/analysis/{{ analysis.analysis_id }}/feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        rating: currentRating,
+                        feedback: feedback
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Thank you for your feedback!');
+                } else {
+                    alert('Error submitting feedback: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function rerunAnalysis() {
+            if (confirm('This will generate a new analysis. This may take a few minutes. Continue?')) {
+                window.location.href = `/api/post_upload_analysis/{{ project.id }}`;
+            }
+        }
+
+        function exportAsJSON() {
+            const data = {{ analysis.results|tojson }};
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analysis_{{ analysis.analysis_id }}.json`;
+            a.click();
+        }
+
+        function exportAsPDF() {
+            window.print();
+        }
+
+        function exportAsCSV() {
+            alert('CSV export functionality coming soon!');
+        }
+
+        // Initialize stars
+        updateStars();
+    </script>
+</body>
+</html>

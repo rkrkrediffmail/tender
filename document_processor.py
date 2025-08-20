@@ -2,11 +2,19 @@ import os
 import PyPDF2
 import docx
 import openpyxl
-from PIL import Image
-import pytesseract
 import anthropic
 import logging
+import json
 from werkzeug.utils import secure_filename
+
+# Optional imports for enhanced functionality
+try:
+    from PIL import Image
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+    logging.warning("PIL/pytesseract not available - OCR functionality disabled")
 
 class DocumentProcessor:
     def __init__(self, anthropic_api_key, upload_folder='uploads'):
