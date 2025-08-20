@@ -10,7 +10,7 @@ WTForms==3.1.1
 Jinja2==3.1.2
 
 # WSGI server for production
-gunicorn==21.2.0
+gunicorn==23.0.0
 
 # Database drivers (Latest)
 psycopg2-binary==2.9.9
