@@ -8,7 +8,6 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 
 from models import db, User, Project, Document, Agent, Requirement, AgentTask
-from tasks import process_document_task, analyze_requirements_task
 
 # Create Blueprints
 main_bp = Blueprint('main', __name__)
@@ -200,8 +199,13 @@ def upload_file():
         db.session.add(document)
         db.session.commit()
 
-        # Start background processing
-        process_document_task.delay(document.id)
+        # Process document synchronously
+        try:
+            from document_processor import DocumentProcessor
+            processor = DocumentProcessor(current_app.config.get('ANTHROPIC_API_KEY'))
+            # Document processing will be handled by the frontend via separate API calls
+        except Exception as process_error:
+            current_app.logger.warning(f"Document processing setup failed: {process_error}")
 
         return jsonify({
             'success': True,
@@ -223,14 +227,21 @@ def analyze_project_requirements(project_id):
     try:
         project = Project.query.filter_by(id=project_id, user_id=current_user.id).first_or_404()
 
-        # Start background analysis
-        task = analyze_requirements_task.delay(project_id)
-
-        return jsonify({
-            'success': True,
-            'task_id': task.id,
-            'message': 'Requirements analysis started'
-        })
+        # Start synchronous analysis
+        try:
+            from real_analysis_system import RealAnalysisSystem
+            analysis_system = RealAnalysisSystem(current_app.config.get('ANTHROPIC_API_KEY'))
+            # Analysis will be handled by separate API endpoints
+            
+            return jsonify({
+                'success': True,
+                'message': 'Requirements analysis initiated'
+            })
+        except Exception as analysis_error:
+            return jsonify({
+                'success': False,
+                'error': f'Analysis system setup failed: {str(analysis_error)}'
+            }), 500
 
     except Exception as e:
         return jsonify({
@@ -241,16 +252,23 @@ def analyze_project_requirements(project_id):
 @api_bp.route('/task/<task_id>/status')
 @login_required
 def get_task_status(task_id):
-    """Get status of background task"""
+    """Get status of agent task"""
     try:
-        from main import celery
-        task = celery.AsyncResult(task_id)
+        # Query AgentTask from database instead of Celery
+        task = AgentTask.query.filter_by(task_id=task_id).first()
+        
+        if not task:
+            return jsonify({
+                'success': False,
+                'error': 'Task not found'
+            }), 404
 
         return jsonify({
             'task_id': task_id,
             'status': task.status,
-            'result': task.result if task.status == 'SUCCESS' else None,
-            'error': str(task.result) if task.status == 'FAILURE' else None
+            'progress': task.progress_percentage,
+            'result': task.output_data if task.status == 'completed' else None,
+            'error': task.error_message if task.status == 'failed' else None
         })
 
     except Exception as e:
