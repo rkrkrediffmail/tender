@@ -385,9 +385,11 @@ def create_app():
     def post_analysis_page(project_id):
         """Display post-upload analysis page"""
         try:
-            from models import User, Project
-            user = User.query.filter_by(username=session['username']).first()
-            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            from models import Project
+            from flask_login import current_user
+            
+            # Use Flask-Login's current_user instead of session
+            project = Project.query.filter_by(id=project_id, user_id=current_user.id).first_or_404()
 
             return render_template('post_analysis.html', project=project)
         except Exception as e:

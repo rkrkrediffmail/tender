@@ -157,6 +157,15 @@
         // Trigger analysis when page loads
         document.addEventListener('DOMContentLoaded', function() {
             const projectId = "{{ project.id }}";  // Fixed: Added quotes for string
+            
+            // Debug: Check if projectId is properly defined
+            console.log('Project ID from template:', projectId);
+            
+            if (!projectId || projectId === '' || projectId === 'None') {
+                showError('Project ID is not defined. Please refresh the page or contact support.');
+                return;
+            }
+            
             startPostUploadAnalysis(projectId);
         });
 
