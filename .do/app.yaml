@@ -1,0 +1,32 @@
+name: itss-rfpplus
+services:
+- name: web
+  source_dir: /
+  github:
+    branch: main
+    deploy_on_push: true
+  dockerfile_path: Dockerfile
+  build_command: ""
+  http_port: 5000
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  health_check:
+    http_path: /health
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    type: SECRET
+  - key: SECRET_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: ANTHROPIC_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: OPENAI_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: FLASK_ENV
+    scope: RUN_TIME
+    value: production
