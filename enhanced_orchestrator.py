@@ -27,35 +27,36 @@ class EnhancedAgentOrchestrator:
 
     def _get_or_create_agent_id(self, agent_type: str) -> int:
         """Get agent ID by type, create if not exists"""
-        agent = Agent.query.filter_by(agent_type=agent_type).first()
+        agent = Agent.query.filter_by(type=agent_type).first()
         if not agent:
             # Create the agent based on type
             if agent_type == 'PARTNER_RECOMMENDATION':
                 agent = Agent(
                     name='Partner Recommendation Agent',
-                    agent_type='PARTNER_RECOMMENDATION',
-                    description='AI agent that analyzes requirements and recommends partner products',
-                    model_name='claude-sonnet-4',
-                    temperature=0.3,
-                    is_active=True
+                    type='PARTNER_RECOMMENDATION',
+                    status='active',
+                    capabilities=['partner_matching', 'requirements_analysis', 'product_recommendation'],
+                    config={'model_name': 'claude-sonnet-4', 'temperature': 0.3}
                 )
             elif agent_type == 'ASSUMPTIONS_ANALYSIS':
                 agent = Agent(
                     name='Assumptions Analysis Agent',
-                    agent_type='ASSUMPTIONS_ANALYSIS',
-                    description='AI agent that identifies project assumptions and provides strategic recommendations',
-                    model_name='claude-sonnet-4',
-                    temperature=0.2,  # Lower temperature for more consistent analysis
-                    is_active=True,
-                    system_prompt="""You are an expert project assumptions analyst and strategic advisor. 
-                    Your role is to identify explicit and implicit assumptions, highlight preconditions, 
-                    provide strategic recommendations, and identify potential risks with mitigation strategies."""
+                    type='ASSUMPTIONS_ANALYSIS',
+                    status='active',
+                    capabilities=['assumptions_identification', 'risk_analysis', 'strategic_recommendations'],
+                    config={
+                        'model_name': 'claude-sonnet-4', 
+                        'temperature': 0.2,
+                        'system_prompt': """You are an expert project assumptions analyst and strategic advisor. 
+                        Your role is to identify explicit and implicit assumptions, highlight preconditions, 
+                        provide strategic recommendations, and identify potential risks with mitigation strategies."""
+                    }
                 )
             db.session.add(agent)
             db.session.commit()
         return agent.id
 
-    async def run_complete_project_analysis(self, project_id: int) -> Dict[str, Any]:
+    async def run_complete_project_analysis(self, project_id: str) -> Dict[str, Any]:
         """
         Run complete project analysis including assumptions analysis and partner recommendations
         """
@@ -94,7 +95,7 @@ class EnhancedAgentOrchestrator:
             results['errors'].append(f"Complete analysis failed: {str(e)}")
             return results
 
-    async def run_assumptions_analysis(self, project_id: int, analysis_type: str = 'full') -> Dict[str, Any]:
+    async def run_assumptions_analysis(self, project_id: str, analysis_type: str = 'full') -> Dict[str, Any]:
         """
         Run assumptions analysis for a project
         
@@ -146,7 +147,7 @@ class EnhancedAgentOrchestrator:
                 'analysis_data': None
             }
 
-    async def run_partner_analysis(self, project_id: int) -> Dict[str, Any]:
+    async def run_partner_analysis(self, project_id: str) -> Dict[str, Any]:
         """
         Run partner recommendation analysis for a project
         """
@@ -197,13 +198,13 @@ class EnhancedAgentOrchestrator:
                 'partner_recommendations': []
             }
 
-    def _get_project_context(self, project_id: int) -> tuple:
+    def _get_project_context(self, project_id: str) -> tuple:
         """Get project context data for analysis"""
         try:
             from models import Requirement
             
             # Get project
-            project = Project.query.get(project_id)
+            project = Project.query.filter_by(id=project_id).first()
             if not project:
                 raise ValueError(f"Project {project_id} not found")
 
@@ -267,13 +268,13 @@ class EnhancedAgentOrchestrator:
                 {'technologies': ['Web Application'], 'components': ['Application'], 'integration_patterns': [], 'security_requirements': []}
             )
 
-    def trigger_assumptions_analysis(self, project_id: int, analysis_type: str = 'full') -> str:
+    def trigger_assumptions_analysis(self, project_id: str, analysis_type: str = 'full') -> str:
         """
         Trigger assumptions analysis as a standalone task (for API endpoint)
         """
         try:
             # Validate project exists
-            project = Project.query.get(project_id)
+            project = Project.query.filter_by(id=project_id).first()
             if not project:
                 raise ValueError(f"Project {project_id} not found")
 
@@ -299,7 +300,7 @@ class EnhancedAgentOrchestrator:
         except Exception as e:
             raise Exception(f"Failed to trigger assumptions analysis: {str(e)}")
 
-    def trigger_partner_analysis(self, project_id: int) -> str:
+    def trigger_partner_analysis(self, project_id: str) -> str:
         """
         Trigger partner analysis as a standalone task (for API endpoint)
         """

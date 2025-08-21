@@ -24,6 +24,7 @@ Pillow==10.2.0  # Image processing - needed for document processor
 # pytesseract==0.3.10  # Heavy OCR - commented out for minimal build
 # python-magic==0.4.27  # Not essential
 # weasyprint>=59.0  # Heavy PDF generation - commented out
+reportlab==4.0.7  # Lightweight PDF generation for analysis reports
 
 # Security and utilities (Latest)
 Werkzeug==3.0.1

@@ -73,10 +73,13 @@
                 <!-- Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h2><i class="fas fa-analytics me-2"></i>Post-Upload Analysis</h2>
-                        <p class="text-muted">{{ project.name }} - Go/No-Go Decision Support</p>
+                        <h2><i class="fas fa-chart-line me-2"></i>Executive Analysis & Strategic Assessment</h2>
+                        <p class="text-muted">{{ project.name }} - Management Decision Support</p>
                     </div>
                     <div>
+                        <button id="downloadPdfBtn" class="btn btn-success me-2" onclick="downloadAnalysisPDF()" style="display: none;">
+                            <i class="fas fa-file-pdf me-2"></i>Download PDF
+                        </button>
                         <a href="/project/{{ project.id }}/analysis-history" class="btn btn-info me-2">
                             <i class="fas fa-history me-2"></i>View Analysis History
                         </a>
@@ -86,38 +89,23 @@
                     </div>
                 </div>
 
-                <!-- Go/No-Go Summary -->
-                <div class="card mb-4" id="goNoGoCard">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Go/No-Go Recommendation</h4>
-                    </div>
-                    <div class="card-body" id="recommendationContent">
-                        <div class="text-center py-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Analyzing...</span>
-                            </div>
-                            <p class="mt-3">Analyzing documents for go/no-go decision...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Clarification Items -->
+                <!-- 1. Detailed Analysis / Project Summary -->
                 <div class="card mb-4">
-                    <div class="card-header bg-warning">
-                        <h4 class="mb-0"><i class="fas fa-question-circle me-2"></i>Clarification Items</h4>
-                        <small>Items that are unclear or missing clarity</small>
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>Detailed Analysis & Project Summary</h4>
+                        <small>Executive summary of project requirements and scope</small>
                     </div>
-                    <div class="card-body" id="clarificationItems">
+                    <div class="card-body" id="detailedAnalysis">
                         <div class="text-center py-4">
-                            <div class="spinner-border text-warning" role="status">
+                            <div class="spinner-border text-success" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3">Identifying items needing clarification...</p>
+                            <p class="mt-3">Generating detailed project analysis...</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Risk Assessment -->
+                <!-- 2. Risk Assessment -->
                 <div class="card mb-4">
                     <div class="card-header bg-danger text-white">
                         <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Risk Assessment</h4>
@@ -133,7 +121,39 @@
                     </div>
                 </div>
 
-                <!-- Deadlines & Milestones -->
+                <!-- 3. Assumptions -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h4 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Assumptions</h4>
+                        <small>Key assumptions and strategic recommendations</small>
+                    </div>
+                    <div class="card-body" id="assumptions">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Identifying assumptions and strategic insights...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Clarification Items -->
+                <div class="card mb-4">
+                    <div class="card-header bg-warning">
+                        <h4 class="mb-0"><i class="fas fa-question-circle me-2"></i>Clarification Items</h4>
+                        <small>Items that are unclear or missing clarity</small>
+                    </div>
+                    <div class="card-body" id="clarificationItems">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-warning" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Identifying items needing clarification...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Deadlines & Milestones -->
                 <div class="card mb-4">
                     <div class="card-header bg-info text-white">
                         <h4 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Deadlines & Milestones</h4>
@@ -145,6 +165,22 @@
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                             <p class="mt-3">Extracting deadlines and milestones...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Go/No-Go Recommendation -->
+                <div class="card mb-4" id="goNoGoCard">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Go/No-Go Recommendation</h4>
+                        <small>Final recommendation based on comprehensive analysis</small>
+                    </div>
+                    <div class="card-body" id="recommendationContent">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Analyzing...</span>
+                            </div>
+                            <p class="mt-3">Analyzing documents for go/no-go decision...</p>
                         </div>
                     </div>
                 </div>
@@ -192,32 +228,65 @@
         }
 
         function showStoredResultsInfo(results) {
-            const infoHtml = `
-                <div class="alert alert-info border-0 mb-4">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="alert-heading mb-1">
-                                <i class="fas fa-database me-2"></i>Stored Analysis Results
-                            </h6>
-                            <small class="mb-2 d-block">
-                                Last analysis: ${results.last_analysis_date || 'Unknown date'} 
-                                ${results.ai_provider_used ? `(${results.ai_provider_used.toUpperCase()})` : ''}
-                            </small>
-                            <p class="mb-0 small text-muted">
-                                Displaying cached AI analysis results. All AI responses are stored and can be viewed in detail.
-                            </p>
-                        </div>
-                        <div class="text-end">
-                            <button class="btn btn-outline-primary btn-sm me-2" onclick="viewAllAIResponses()">
-                                <i class="fas fa-robot me-1"></i>View AI Responses
-                            </button>
-                            <button class="btn btn-warning btn-sm" onclick="runFreshAnalysis()">
-                                <i class="fas fa-refresh me-1"></i>Re-run Analysis
-                            </button>
+            let infoHtml;
+            
+            if (results.analysis_type === 'legacy_with_upgrade_available') {
+                // Show upgrade notification for legacy analysis
+                infoHtml = `
+                    <div class="alert alert-warning border-0 mb-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="alert-heading mb-1">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Legacy Analysis - Upgrade Available
+                                </h6>
+                                <small class="mb-2 d-block">
+                                    Last analysis: ${results.last_analysis_date || 'Unknown date'} 
+                                    ${results.ai_provider_used ? `(${results.ai_provider_used.toUpperCase()})` : ''}
+                                </small>
+                                <p class="mb-0 small">
+                                    <strong>${results.upgrade_message || 'Legacy analysis available. New comprehensive executive analysis is now available.'}</strong>
+                                </p>
+                            </div>
+                            <div class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="viewAllAIResponses()">
+                                    <i class="fas fa-robot me-1"></i>View AI Responses
+                                </button>
+                                <button class="btn btn-success btn-sm" onclick="runFreshAnalysis()">
+                                    <i class="fas fa-star me-1"></i>Upgrade to Comprehensive Analysis
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Show normal stored results info
+                infoHtml = `
+                    <div class="alert alert-info border-0 mb-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="alert-heading mb-1">
+                                    <i class="fas fa-database me-2"></i>Comprehensive Analysis Results
+                                </h6>
+                                <small class="mb-2 d-block">
+                                    Last analysis: ${results.last_analysis_date || 'Unknown date'} 
+                                    ${results.ai_provider_used ? `(${results.ai_provider_used.toUpperCase()})` : ''}
+                                </small>
+                                <p class="mb-0 small text-muted">
+                                    Displaying comprehensive AI analysis results. All AI responses are stored and can be viewed in detail.
+                                </p>
+                            </div>
+                            <div class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-2" onclick="viewAllAIResponses()">
+                                    <i class="fas fa-robot me-1"></i>View AI Responses
+                                </button>
+                                <button class="btn btn-warning btn-sm" onclick="runFreshAnalysis()">
+                                    <i class="fas fa-refresh me-1"></i>Re-run Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             
             // Insert before the results sections
             const resultsContainer = document.querySelector('.row');
@@ -251,9 +320,13 @@
             `;
             
             // Show placeholder messages in other sections
-            document.getElementById('clarificationItems').innerHTML = 
+            document.getElementById('detailedAnalysis').innerHTML = 
                 '<div class="text-center py-3 text-muted">Analysis required</div>';
             document.getElementById('riskAssessment').innerHTML = 
+                '<div class="text-center py-3 text-muted">Analysis required</div>';
+            document.getElementById('assumptions').innerHTML = 
+                '<div class="text-center py-3 text-muted">Analysis required</div>';
+            document.getElementById('clarificationItems').innerHTML = 
                 '<div class="text-center py-3 text-muted">Analysis required</div>';
             document.getElementById('deadlinesMilestones').innerHTML = 
                 '<div class="text-center py-3 text-muted">Analysis required</div>';
@@ -272,12 +345,16 @@
             `;
             
             document.getElementById('recommendationContent').innerHTML = loadingHtml;
-            document.getElementById('clarificationItems').innerHTML = 
-                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-warning"></div> Loading...</div>';
+            document.getElementById('detailedAnalysis').innerHTML = 
+                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> Generating detailed analysis...</div>';
             document.getElementById('riskAssessment').innerHTML = 
-                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-danger"></div> Loading...</div>';
+                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-danger"></div> Analyzing risks...</div>';
+            document.getElementById('assumptions').innerHTML = 
+                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div> Identifying assumptions...</div>';
+            document.getElementById('clarificationItems').innerHTML = 
+                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-warning"></div> Finding clarifications...</div>';
             document.getElementById('deadlinesMilestones').innerHTML = 
-                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div> Loading...</div>';
+                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div> Extracting deadlines...</div>';
             
             try {
                 const response = await fetch(`/api/post_upload_analysis/${projectId}/run-fresh`, {
@@ -333,21 +410,239 @@
         }
 
         function displayAnalysisResults(results) {
-            // Update Go/No-Go recommendation
-            document.getElementById('recommendationContent').innerHTML =
-                generateGoNoGoDisplay(results.go_no_go_recommendation);
-
-            // Update clarification items
-            document.getElementById('clarificationItems').innerHTML =
-                generateClarificationDisplay(results.clarification_items);
+            // Update detailed analysis (project summary)
+            document.getElementById('detailedAnalysis').innerHTML =
+                generateDetailedAnalysisDisplay(results.detailed_analysis || results.project_summary);
 
             // Update risk assessment
             document.getElementById('riskAssessment').innerHTML =
                 generateRiskDisplay(results.risks_constraints);
 
+            // Update assumptions
+            document.getElementById('assumptions').innerHTML =
+                generateAssumptionsDisplay(results.assumptions_analysis);
+
+            // Update clarification items
+            document.getElementById('clarificationItems').innerHTML =
+                generateClarificationDisplay(results.clarification_items);
+
             // Update deadlines and milestones
             document.getElementById('deadlinesMilestones').innerHTML =
                 generateDeadlineDisplay(results.deadlines_milestones);
+
+            // Update Go/No-Go recommendation (last)
+            document.getElementById('recommendationContent').innerHTML =
+                generateGoNoGoDisplay(results.go_no_go_recommendation);
+
+            // Show download PDF button
+            document.getElementById('downloadPdfBtn').style.display = 'inline-block';
+        }
+
+        function generateDetailedAnalysisDisplay(analysis) {
+            if (!analysis) {
+                return '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>Executive analysis will be generated based on document content</div>';
+            }
+
+            // Handle if analysis is a string or object
+            if (typeof analysis === 'string') {
+                return `
+                    <div class="analysis-item">
+                        <h5><i class="fas fa-chart-line me-2"></i>Executive Summary</h5>
+                        <div style="white-space: pre-wrap; line-height: 1.6;">${analysis}</div>
+                    </div>
+                `;
+            }
+
+            // Handle upgrade available flag
+            if (analysis.upgrade_available) {
+                return `
+                    <div class="analysis-item" style="background: linear-gradient(135deg, #fff3cd 0%, #fef7e6 100%); border-left: 4px solid #ffc107;">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h5><i class="fas fa-chart-line me-2 text-warning"></i>Executive Summary</h5>
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-star me-1"></i>Upgrade Available
+                            </span>
+                        </div>
+                        <p style="font-size: 1.1em; line-height: 1.6;">
+                            ${analysis.executive_summary || 'Legacy analysis available. Click "Upgrade to Comprehensive Analysis" to get the new executive summary with strategic business insights, competitive positioning, and management recommendations.'}
+                        </p>
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>New in Comprehensive Analysis:</strong> Executive summary for top management, business case analysis, strategic value assessment, competitive positioning, and actionable management insights.
+                            </small>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Handle new executive-focused structure
+            let html = '';
+            
+            // Executive Summary
+            if (analysis.executive_summary) {
+                html += `
+                    <div class="analysis-item" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #007bff;">
+                        <h5><i class="fas fa-chart-line me-2 text-primary"></i>Executive Summary</h5>
+                        <p style="font-size: 1.1em; line-height: 1.6;">${analysis.executive_summary}</p>
+                    </div>
+                `;
+            }
+
+            // Business Case
+            if (analysis.business_case) {
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-briefcase me-2 text-success"></i>Business Case</h6>
+                        ${analysis.business_case.strategic_value ? `<p><strong>Strategic Value:</strong> ${analysis.business_case.strategic_value}</p>` : ''}
+                        ${analysis.business_case.market_opportunity ? `<p><strong>Market Opportunity:</strong> ${analysis.business_case.market_opportunity}</p>` : ''}
+                        ${analysis.business_case.revenue_potential ? `<p><strong>Revenue Potential:</strong> ${analysis.business_case.revenue_potential}</p>` : ''}
+                        ${analysis.business_case.risk_vs_reward ? `<p><strong>Risk vs Reward:</strong> ${analysis.business_case.risk_vs_reward}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            // Project Overview
+            if (analysis.project_overview) {
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-project-diagram me-2 text-info"></i>Project Overview</h6>
+                        ${analysis.project_overview.what_we_are_building ? `<p><strong>Deliverables:</strong> ${analysis.project_overview.what_we_are_building}</p>` : ''}
+                        ${analysis.project_overview.timeline_overview ? `<p><strong>Timeline:</strong> ${analysis.project_overview.timeline_overview}</p>` : ''}
+                        ${analysis.project_overview.client_profile ? `<p><strong>Client:</strong> ${analysis.project_overview.client_profile}</p>` : ''}
+                        ${analysis.project_overview.success_metrics ? `<p><strong>Success Metrics:</strong> ${analysis.project_overview.success_metrics}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            // Key Requirements
+            if (analysis.key_requirements && analysis.key_requirements.length > 0) {
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-list me-2 text-warning"></i>Critical Requirements</h6>
+                        <ul>
+                            ${analysis.key_requirements.map(req => `<li>${req}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Technical Complexity
+            if (analysis.technical_complexity) {
+                const tc = analysis.technical_complexity;
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-cogs me-2 text-secondary"></i>Technical Assessment</h6>
+                        ${tc.complexity_level ? `<p><strong>Complexity Level:</strong> <span class="badge bg-${tc.complexity_level === 'High' ? 'danger' : tc.complexity_level === 'Medium' ? 'warning' : 'success'}">${tc.complexity_level}</span></p>` : ''}
+                        ${tc.key_technologies ? `<p><strong>Key Technologies:</strong> ${tc.key_technologies}</p>` : ''}
+                        ${tc.our_capability_fit ? `<p><strong>Capability Fit:</strong> ${tc.our_capability_fit}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            // Management Considerations
+            if (analysis.management_considerations) {
+                const mc = analysis.management_considerations;
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-users-cog me-2 text-dark"></i>Management Considerations</h6>
+                        ${mc.resource_requirements ? `<p><strong>Resources:</strong> ${mc.resource_requirements}</p>` : ''}
+                        ${mc.budget_implications ? `<p><strong>Budget:</strong> ${mc.budget_implications}</p>` : ''}
+                        ${mc.timeline_pressure ? `<p><strong>Timeline Pressure:</strong> ${mc.timeline_pressure}</p>` : ''}
+                        ${mc.competitive_landscape ? `<p><strong>Competition:</strong> ${mc.competitive_landscape}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            return html || '<div class="alert alert-warning">No detailed analysis data available</div>';
+        }
+
+        function generateAssumptionsDisplay(assumptions) {
+            if (!assumptions) {
+                return '<div class="alert alert-info"><i class="fas fa-lightbulb me-2"></i>Assumptions analysis will be generated to identify key project assumptions</div>';
+            }
+
+            // Handle if assumptions is a string
+            if (typeof assumptions === 'string') {
+                return `
+                    <div class="analysis-item">
+                        <div style="white-space: pre-wrap; line-height: 1.6;">${assumptions}</div>
+                    </div>
+                `;
+            }
+
+            // Handle upgrade available flag
+            if (assumptions.upgrade_available) {
+                return `
+                    <div class="analysis-item" style="background: linear-gradient(135deg, #fff3cd 0%, #fef7e6 100%); border-left: 4px solid #ffc107;">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h5><i class="fas fa-lightbulb me-2 text-warning"></i>Assumptions Analysis</h5>
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-star me-1"></i>Upgrade Available
+                            </span>
+                        </div>
+                        ${assumptions.key_assumptions && assumptions.key_assumptions.length > 0 ? `
+                            <ul>
+                                ${assumptions.key_assumptions.map(assumption => `
+                                    <li class="mb-2">
+                                        <strong>${assumption.category || 'General'}:</strong> ${assumption.description || assumption}
+                                        ${assumption.impact ? `<br><small class="text-muted">Impact: ${assumption.impact}</small>` : ''}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : ''}
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>New in Comprehensive Analysis:</strong> Strategic assumptions analysis, risk factor identification, success factors assessment, and strategic recommendations for decision-making.
+                            </small>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Handle structured assumptions object
+            let html = '';
+
+            if (assumptions.key_assumptions && assumptions.key_assumptions.length > 0) {
+                html += `
+                    <div class="analysis-item">
+                        <h6><i class="fas fa-lightbulb me-2"></i>Key Assumptions</h6>
+                        <ul>
+                            ${assumptions.key_assumptions.map(assumption => `
+                                <li class="mb-2">
+                                    <strong>${assumption.category || 'General'}:</strong> ${assumption.description || assumption}
+                                    ${assumption.impact ? `<br><small class="text-muted">Impact: ${assumption.impact}</small>` : ''}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (assumptions.strategic_recommendations && assumptions.strategic_recommendations.length > 0) {
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-chess me-2"></i>Strategic Recommendations</h6>
+                        <ul>
+                            ${assumptions.strategic_recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (assumptions.risk_factors && assumptions.risk_factors.length > 0) {
+                html += `
+                    <div class="analysis-item mt-3">
+                        <h6><i class="fas fa-exclamation-circle me-2"></i>Risk Factors</h6>
+                        <ul>
+                            ${assumptions.risk_factors.map(risk => `<li>${risk}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            return html || '<div class="alert alert-warning">No assumptions data available</div>';
         }
 
         function generateGoNoGoDisplay(recommendation) {
@@ -528,10 +823,56 @@
                 </div>
             `;
 
-            document.getElementById('recommendationContent').innerHTML = errorHtml;
-            document.getElementById('clarificationItems').innerHTML = errorHtml;
+            document.getElementById('detailedAnalysis').innerHTML = errorHtml;
             document.getElementById('riskAssessment').innerHTML = errorHtml;
+            document.getElementById('assumptions').innerHTML = errorHtml;
+            document.getElementById('clarificationItems').innerHTML = errorHtml;
             document.getElementById('deadlinesMilestones').innerHTML = errorHtml;
+            document.getElementById('recommendationContent').innerHTML = errorHtml;
+        }
+
+        async function downloadAnalysisPDF() {
+            try {
+                // Show loading state on button
+                const downloadBtn = document.getElementById('downloadPdfBtn');
+                const originalText = downloadBtn.innerHTML;
+                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating PDF...';
+                downloadBtn.disabled = true;
+
+                // Call PDF generation endpoint
+                const response = await fetch(`/api/analysis/${projectId}/download-pdf`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    // Create download link
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `comprehensive_analysis_${projectId}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    alert('PDF generation failed: ' + (error.error || 'Unknown error'));
+                }
+
+                // Restore button
+                downloadBtn.innerHTML = originalText;
+                downloadBtn.disabled = false;
+
+            } catch (error) {
+                console.error('PDF download error:', error);
+                alert('Failed to download PDF: ' + error.message);
+                
+                // Restore button
+                const downloadBtn = document.getElementById('downloadPdfBtn');
+                downloadBtn.innerHTML = '<i class="fas fa-file-pdf me-2"></i>Download PDF';
+                downloadBtn.disabled = false;
+            }
         }
     </script>
 </body>

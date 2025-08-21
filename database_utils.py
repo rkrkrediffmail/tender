@@ -99,13 +99,16 @@ def initialize_agents():
         if not existing_agent:
             agent = Agent(
                 name=agent_data['name'],
-                agent_type=agent_data['agent_type'],
-                description=agent_data['description'],
-                model_name=agent_data['model_name'],
+                type=agent_data['agent_type'],
                 status=agent_data['status'],
-                specialties=agent_data['specialties'],
-                performance_metrics=agent_data['performance_metrics'],
-                config={'temperature': 0.7, 'max_tokens': 4000}
+                capabilities=agent_data['specialties'],
+                config={
+                    'description': agent_data['description'],
+                    'model_name': agent_data['model_name'],
+                    'temperature': 0.7, 
+                    'max_tokens': 4000,
+                    'performance_metrics': agent_data['performance_metrics']
+                }
             )
             db.session.add(agent)
     

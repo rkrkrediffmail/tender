@@ -190,24 +190,21 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <a href="/post_analysis/{{ project.id }}" class="btn btn-primary w-100">
-                                    <i class="fas fa-analytics me-2"></i>Go/No-Go Analysis
+                            <div class="col-md-8 mb-3">
+                                <a href="/post_analysis/{{ project.id }}" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-robot me-2"></i>Comprehensive AI Analysis
+                                    <small class="d-block mt-1">Detailed Analysis • Risk Assessment • Assumptions • Clarifications • Deadlines • Go/No-Go</small>
                                 </a>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <a href="/analysis/{{ project.id }}" class="btn btn-outline-primary w-100">
-                                    <i class="fas fa-chart-line me-2"></i>Detailed Analysis
-                                </a>
+                            <div class="col-md-4 mb-3">
+                                <button id="rerunAnalysisBtn" onclick="rerunAnalysis()" class="btn btn-success btn-lg w-100 h-100" title="Re-run AI analysis with latest algorithms">
+                                    <i class="fas fa-sync-alt me-2"></i>Re-run<br>
+                                    <small>Fresh Analysis</small>
+                                </button>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <a href="/project/{{ project.id }}/analysis-history" class="btn btn-outline-info w-100">
                                     <i class="fas fa-history me-2"></i>Analysis History
-                                </a>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <a href="/assumptions?project_id={{ project.id }}" class="btn btn-outline-success w-100">
-                                    <i class="fas fa-brain me-2"></i>Assumptions Analysis
                                 </a>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -519,6 +516,46 @@
                 }
             } catch (error) {
                 alert('Network error: ' + error.message);
+            }
+        }
+
+        async function rerunAnalysis() {
+            const projectId = "{{ project.id }}";
+            const rerunBtn = document.getElementById('rerunAnalysisBtn');
+            
+            // Show loading state
+            const originalText = rerunBtn.innerHTML;
+            rerunBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...<br><small>Please wait</small>';
+            rerunBtn.disabled = true;
+            
+            try {
+                // Call the fresh analysis endpoint
+                const response = await fetch(`/api/post_upload_analysis/${projectId}/run-fresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Success - show message and redirect to analysis page
+                    alert('✅ Fresh analysis completed successfully!\\n\\nRedirecting to view results...');
+                    window.location.href = `/post_analysis/${projectId}`;
+                } else {
+                    // Error
+                    alert('❌ Analysis failed: ' + (data.error || 'Unknown error'));
+                    console.error('Analysis error:', data);
+                }
+                
+            } catch (error) {
+                console.error('Network error:', error);
+                alert('❌ Network error during analysis: ' + error.message);
+            } finally {
+                // Restore button state
+                rerunBtn.innerHTML = originalText;
+                rerunBtn.disabled = false;
             }
         }
     </script>

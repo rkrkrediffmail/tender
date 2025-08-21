@@ -158,7 +158,7 @@
 
         <!-- System Status Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card metric-card text-center">
                     <div class="card-body">
                         <h3 id="activeProjects">{{ user_projects|length }}</h3>
@@ -167,7 +167,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card text-center">
                     <div class="card-body">
                         <h3 class="text-success" id="completedProjects">0</h3>
@@ -176,30 +176,12 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h3 class="text-warning" id="recentActivity">{{ system_status.get('recent_activity_count', 0) }}</h3>
-                        <p class="mb-0">Recent Activity</p>
-                        <small class="text-muted">Documents last 7 days</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card text-center">
                     <div class="card-body">
                         <h3 class="text-info" id="avgCompletion">0%</h3>
                         <p class="mb-0">Avg. Progress</p>
                         <small class="text-muted">Active projects completion</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h3 class="text-primary" id="dominantRfpType">Implementation</h3>
-                        <p class="mb-0">Top RFP Type</p>
-                        <small class="text-muted">Most common category</small>
                     </div>
                 </div>
             </div>
@@ -362,18 +344,7 @@
             // Update metric cards with new data
             document.getElementById('activeProjects').textContent = stats.active_projects;
             document.getElementById('completedProjects').textContent = stats.completed_projects;
-            document.getElementById('recentActivity').textContent = stats.recent_activity;
             document.getElementById('avgCompletion').textContent = stats.avg_completion + '%';
-            
-            // Update dominant RFP type
-            if (stats.rfp_types && Object.keys(stats.rfp_types).length > 0) {
-                const sortedTypes = Object.entries(stats.rfp_types).sort((a, b) => b[1] - a[1]);
-                const topType = sortedTypes[0][0];
-                const formattedType = topType.charAt(0).toUpperCase() + topType.slice(1);
-                document.getElementById('dominantRfpType').textContent = formattedType;
-            } else {
-                document.getElementById('dominantRfpType').textContent = 'None';
-            }
         }
         
         function updateProjectsList(projects) {

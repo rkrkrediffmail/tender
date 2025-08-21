@@ -7,6 +7,7 @@ from datetime import datetime
 import re
 from typing import List, Dict, Any
 from ai_providers import get_ai_manager, AIProviderManager
+from ai_response_manager import AIResponseManager
 
 class RealAnalysisSystem:
     def __init__(self, project, ai_provider: str = None):
@@ -562,6 +563,267 @@ class RealAnalysisSystem:
                     return self._fallback_go_no_go(error_msg)
         
         return self._fallback_go_no_go("Maximum retries exceeded")
+
+    def generate_detailed_analysis(self, content: str, max_retries: int = 2, project_id: str = None) -> Dict:
+        """Generate detailed project analysis and executive summary"""
+        if not self.ai_manager.available_providers:
+            return self._fallback_detailed_analysis("No AI providers available")
+        
+        prompt = f"""
+        You are an AI Response Manager providing an executive summary and project assessment for TOP MANAGEMENT. 
+        Analyze the following RFP/tender documents and provide a comprehensive overview that executives can use to make strategic decisions.
+
+        DOCUMENTS TO ANALYZE:
+        {content[:8000]}
+
+        Provide a management-focused analysis with the following structure:
+
+        {{
+            "executive_summary": "EXECUTIVE SUMMARY FOR TOP MANAGEMENT: A concise 2-3 paragraph overview that captures the essence of this opportunity, its strategic value, key challenges, and business impact. Write this as if briefing the CEO/Board on whether we should pursue this project.",
+            "business_case": {{
+                "strategic_value": "Why this project matters strategically to our organization",
+                "market_opportunity": "Market size, competitive advantage, or strategic positioning benefits",
+                "revenue_potential": "Expected financial benefits, contract value, or revenue impact",
+                "risk_vs_reward": "High-level assessment of opportunity vs. risks"
+            }},
+            "project_overview": {{
+                "what_we_are_building": "In plain business terms, what exactly are we being asked to deliver",
+                "timeline_overview": "Key phases and overall project duration",
+                "client_profile": "Who is the client and why this relationship matters",
+                "success_metrics": "How success will be measured"
+            }},
+            "key_requirements": [
+                "Top 5-7 most critical requirements that define project success",
+                "Focus on business-critical items, not technical details"
+            ],
+            "technical_complexity": {{
+                "complexity_level": "Low/Medium/High with clear reasoning",
+                "key_technologies": "Main technical platforms/technologies required",
+                "integration_challenges": "Major technical integration or compatibility issues",
+                "our_capability_fit": "How well this aligns with our current technical capabilities"
+            }},
+            "management_considerations": {{
+                "resource_requirements": "High-level view of team size, skillsets, and duration needed",
+                "budget_implications": "Estimated investment required (development, infrastructure, etc.)",
+                "timeline_pressure": "Any time constraints or deadline pressure factors",
+                "competitive_landscape": "Are we competing against major players?"
+            }},
+            "go_no_go_factors": {{
+                "pros": ["Top reasons why this is a good opportunity"],
+                "cons": ["Main concerns or red flags to consider"],
+                "critical_success_factors": ["What must go right for this project to succeed"]
+            }}
+        }}
+
+        Focus on providing ACTIONABLE INTELLIGENCE for executive decision-making:
+        1. Strategic business value and competitive positioning
+        2. Financial opportunity and resource requirements  
+        3. Risk assessment and mitigation needs
+        4. Alignment with organizational capabilities
+        5. Market timing and competitive factors
+
+        Write in executive language - clear, concise, focused on business impact.
+        Respond only with valid JSON matching the structure above.
+        """
+
+        for attempt in range(max_retries + 1):
+            ai_response = None
+            try:
+                # Create AI response record
+                if project_id:
+                    ai_response = AIResponseManager.create_response(
+                        project_id=project_id,
+                        request_type='detailed_analysis',
+                        prompt=prompt[:1000] + "..." if len(prompt) > 1000 else prompt,
+                        ai_provider=self.ai_manager.preferred_provider,
+                        ai_model='claude-sonnet-4',
+                        context_data={'analysis_type': 'comprehensive_executive_summary'}
+                    )
+
+                response_content = self._call_ai_api(
+                    messages=[
+                        {"role": "system", "content": "You are an AI Response Manager providing executive analysis for top management. Always respond with valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=4000
+                )
+                
+                response = response_content.strip()
+                # Clean up any markdown formatting
+                response = re.sub(r'```json\n?', '', response)
+                response = re.sub(r'```\n?', '', response)
+                
+                try:
+                    # Parse JSON response
+                    detailed_analysis = json.loads(response)
+                    
+                    # Validate required fields
+                    required_fields = ['executive_summary', 'business_case', 'project_overview', 'key_requirements']
+                    if all(field in detailed_analysis for field in required_fields):
+                        print(f"✅ Detailed analysis generated successfully")
+                        
+                        # Complete AI response storage
+                        if ai_response:
+                            AIResponseManager.complete_response(
+                                response=ai_response,
+                                raw_response=response,
+                                parsed_response=detailed_analysis,
+                                metadata={
+                                    'requirements_count': len(detailed_analysis.get('key_requirements', [])),
+                                    'business_case_fields': len([k for k in detailed_analysis.get('business_case', {}).keys()]),
+                                    'complexity': detailed_analysis.get('technical_complexity', {}).get('complexity_level', 'Not specified'),
+                                    'analysis_scope': 'comprehensive_executive_summary'
+                                }
+                            )
+                        
+                        return detailed_analysis
+                    else:
+                        continue
+                        
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+            except Exception as e:
+                error_msg = f"API error on attempt {attempt + 1}: {e}"
+                print(error_msg)
+                
+                # Mark AI response as failed
+                if ai_response:
+                    AIResponseManager.fail_response(
+                        response=ai_response,
+                        error_message=error_msg
+                    )
+                    
+                if attempt == max_retries:
+                    return self._fallback_detailed_analysis(error_msg)
+        
+        return self._fallback_detailed_analysis("Maximum retries exceeded")
+
+    def generate_assumptions_analysis(self, content: str, max_retries: int = 2, project_id: str = None) -> Dict:
+        """Generate comprehensive assumptions analysis"""
+        if not self.ai_manager.available_providers:
+            return self._fallback_assumptions_analysis("No AI providers available")
+        
+        prompt = f"""
+        Analyze the following RFP/tender documents and identify key assumptions, strategic insights, and recommendations:
+
+        DOCUMENTS TO ANALYZE:
+        {content[:8000]}
+
+        Please provide a comprehensive assumptions analysis with the following structure:
+
+        {{
+            "key_assumptions": [
+                {{
+                    "category": "Technical|Business|Resource|Timeline|External",
+                    "description": "Clear description of the assumption",
+                    "impact": "Low|Medium|High",
+                    "risk_if_wrong": "What happens if this assumption is incorrect"
+                }}
+            ],
+            "strategic_recommendations": [
+                "Key strategic recommendations for this project",
+                "Important considerations for decision-making",
+                "Recommended approaches or strategies"
+            ],
+            "risk_factors": [
+                "Implicit risks based on document analysis",
+                "Assumptions that could become major risks",
+                "Dependencies that may impact success"
+            ],
+            "clarification_needs": [
+                "Questions that should be asked to validate assumptions",
+                "Areas where more information is needed"
+            ],
+            "success_factors": [
+                "Critical factors for project success",
+                "Key capabilities or resources needed"
+            ]
+        }}
+
+        Focus on:
+        1. Implicit assumptions not explicitly stated in documents
+        2. Strategic insights about project approach
+        3. Risk factors that may not be obvious
+        4. Recommendations for improving chances of success
+        5. Questions that should be asked to clarify ambiguities
+
+        Respond only with valid JSON matching the structure above.
+        """
+
+        for attempt in range(max_retries + 1):
+            ai_response = None
+            try:
+                # Create AI response record
+                if project_id:
+                    ai_response = AIResponseManager.create_response(
+                        project_id=project_id,
+                        request_type='assumptions_analysis',
+                        prompt=prompt[:1000] + "..." if len(prompt) > 1000 else prompt,
+                        ai_provider=self.ai_manager.preferred_provider,
+                        ai_model='claude-sonnet-4',
+                        context_data={'analysis_type': 'strategic_assumptions_analysis'}
+                    )
+
+                response_content = self._call_ai_api(
+                    messages=[
+                        {"role": "system", "content": "You are an expert project assumptions analyst. Always respond with valid JSON matching the requested structure."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=4000
+                )
+                
+                response = response_content.strip()
+                # Clean up any markdown formatting
+                response = re.sub(r'```json\n?', '', response)
+                response = re.sub(r'```\n?', '', response)
+                
+                try:
+                    # Parse JSON response
+                    assumptions_analysis = json.loads(response)
+                    
+                    # Validate required fields
+                    required_fields = ['key_assumptions', 'strategic_recommendations', 'risk_factors']
+                    if all(field in assumptions_analysis for field in required_fields):
+                        print(f"✅ Assumptions analysis generated successfully")
+                        
+                        # Complete AI response storage
+                        if ai_response:
+                            AIResponseManager.complete_response(
+                                response=ai_response,
+                                raw_response=response,
+                                parsed_response=assumptions_analysis,
+                                metadata={
+                                    'assumptions_count': len(assumptions_analysis.get('key_assumptions', [])),
+                                    'recommendations_count': len(assumptions_analysis.get('strategic_recommendations', [])),
+                                    'risk_factors_count': len(assumptions_analysis.get('risk_factors', [])),
+                                    'success_factors_count': len(assumptions_analysis.get('success_factors', [])),
+                                    'analysis_scope': 'strategic_assumptions_analysis'
+                                }
+                            )
+                        
+                        return assumptions_analysis
+                    else:
+                        continue
+                        
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+            except Exception as e:
+                error_msg = f"API error on attempt {attempt + 1}: {e}"
+                print(error_msg)
+                
+                # Mark AI response as failed
+                if ai_response:
+                    AIResponseManager.fail_response(
+                        response=ai_response,
+                        error_message=error_msg
+                    )
+                    
+                if attempt == max_retries:
+                    return self._fallback_assumptions_analysis(error_msg)
+        
+        return self._fallback_assumptions_analysis("Maximum retries exceeded")
     
     # Fallback methods for when AI is not available
     def _fallback_clarification_items(self, reason: str = "AI analysis not available") -> List[Dict]:
@@ -634,6 +896,115 @@ class RealAnalysisSystem:
                 "Evaluate compliance requirements manually"
             ],
             "failure_reason": reason
+        }
+
+    def _fallback_detailed_analysis(self, reason: str = "AI analysis not available") -> Dict:
+        """Fallback detailed analysis when AI is not available"""
+        return {
+            "executive_summary": f"EXECUTIVE SUMMARY FOR TOP MANAGEMENT: AI-powered strategic analysis is currently unavailable ({reason}). This project requires manual executive assessment to determine strategic value, business impact, and go/no-go decision. Immediate action required: engage senior analysts to review RFP documents and provide strategic recommendation within 24-48 hours.",
+            "business_case": {
+                "strategic_value": f"Strategic assessment unavailable due to: {reason}. Manual evaluation required.",
+                "market_opportunity": "Market analysis requires manual competitive intelligence gathering.",
+                "revenue_potential": "Financial impact assessment pending manual review of contract terms.",
+                "risk_vs_reward": "Risk-reward analysis requires immediate manual assessment by leadership team."
+            },
+            "project_overview": {
+                "what_we_are_building": "Project deliverables require manual analysis of RFP requirements and specifications.",
+                "timeline_overview": "Timeline assessment pending manual review of project phases and deadlines.",
+                "client_profile": "Client assessment requires manual research and relationship analysis.",
+                "success_metrics": "Success criteria need manual identification from contract terms."
+            },
+            "key_requirements": [
+                "Manual review of ALL RFP documents by senior analysts",
+                "Strategic assessment by executive team within 48 hours",
+                "Technical feasibility review by architecture team",
+                "Financial analysis of contract terms and profitability",
+                "Risk assessment and mitigation strategy development",
+                "Resource planning and capability gap analysis",
+                "Competitive positioning and win probability assessment"
+            ],
+            "technical_complexity": {
+                "complexity_level": "Unknown - Immediate Assessment Required",
+                "key_technologies": "Technology stack requires manual identification and assessment.",
+                "integration_challenges": "Integration complexity requires technical team evaluation.",
+                "our_capability_fit": "Capability assessment requires immediate internal review."
+            },
+            "management_considerations": {
+                "resource_requirements": "Resource planning requires immediate management attention and assessment.",
+                "budget_implications": "Budget analysis requires manual financial review of contract terms and delivery requirements.",
+                "timeline_pressure": "Timeline constraints require immediate project management assessment.",
+                "competitive_landscape": "Competitive analysis requires manual market intelligence gathering."
+            },
+            "go_no_go_factors": {
+                "pros": [
+                    "Project documents successfully uploaded and accessible for manual review",
+                    "Executive team can conduct manual strategic assessment",
+                    "Opportunity to demonstrate manual analysis capabilities"
+                ],
+                "cons": [
+                    f"AI analysis system failure: {reason}",
+                    "Increased time required for manual assessment (24-48 hours)",
+                    "Higher risk of missing critical insights without AI analysis",
+                    "Resource intensive manual review process required"
+                ],
+                "critical_success_factors": [
+                    "Immediate engagement of senior analysts for manual review",
+                    "Executive team availability for strategic assessment",
+                    "Technical team capacity for feasibility analysis",
+                    "Resolve AI system issues for future opportunities"
+                ]
+            },
+            "failure_reason": reason,
+            "manual_action_required": True,
+            "urgency_level": "HIGH - Executive Action Required Within 48 Hours"
+        }
+
+    def _fallback_assumptions_analysis(self, reason: str = "AI analysis not available") -> Dict:
+        """Fallback assumptions analysis when AI is not available"""
+        return {
+            "key_assumptions": [
+                {
+                    "category": "Technical",
+                    "description": f"AI assumptions analysis failed ({reason}). Manual identification of technical assumptions required.",
+                    "impact": "High",
+                    "risk_if_wrong": "Critical project assumptions may be missed without proper analysis"
+                },
+                {
+                    "category": "Business",
+                    "description": "Business context and requirements assumptions need manual evaluation",
+                    "impact": "High", 
+                    "risk_if_wrong": "Misaligned business expectations and project delivery"
+                }
+            ],
+            "strategic_recommendations": [
+                "Conduct manual review of all project documentation",
+                "Engage with stakeholders to validate assumptions",
+                "Perform risk assessment with subject matter experts",
+                "Review similar past projects for lessons learned",
+                "Consider external consultation for complex requirements"
+            ],
+            "risk_factors": [
+                f"AI analysis capability unavailable: {reason}",
+                "Potential blind spots in assumption identification",
+                "Increased reliance on manual review processes",
+                "Higher risk of missing critical project assumptions",
+                "Need for additional validation steps"
+            ],
+            "clarification_needs": [
+                "Verify AI analysis system configuration and connectivity",
+                "Review and validate all project assumptions manually",
+                "Confirm technical requirements with stakeholders",
+                "Validate business objectives and success criteria"
+            ],
+            "success_factors": [
+                "Thorough manual document review process",
+                "Stakeholder engagement and validation",
+                "Expert review of technical requirements",
+                "Systematic assumption documentation",
+                "Risk mitigation planning"
+            ],
+            "failure_reason": reason,
+            "manual_action_required": True
         }
     
 class RealAnalysisEngine:
