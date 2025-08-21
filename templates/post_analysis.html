@@ -154,10 +154,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Define projectId globally so all functions can access it
+        const projectId = "{{ project.id }}";  // Fixed: Added quotes for string
+        
         // Trigger analysis when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            const projectId = "{{ project.id }}";  // Fixed: Added quotes for string
-            
             // Debug: Check if projectId is properly defined
             console.log('Project ID from template:', projectId);
             

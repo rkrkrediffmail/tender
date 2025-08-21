@@ -264,7 +264,12 @@ def create_app():
         try:
             from models import User, Project
             user = User.query.filter_by(username=session['username']).first()
-            user_projects = Project.query.filter_by(user_id=user.id).limit(5).all()
+            # Show only active, non-purged projects on dashboard
+            user_projects = Project.query.filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None)
+            ).order_by(Project.created_at.desc()).limit(5).all()
         except Exception as e:
             user_projects = []
 
@@ -272,6 +277,116 @@ def create_app():
                              system_status=system_status,
                              user_projects=user_projects,
                              user=session.get('username'))
+
+    @app.route('/api/dashboard/stats')
+    @login_required
+    def dashboard_stats():
+        """Get real-time dashboard statistics"""
+        try:
+            from models import User, Project, Document
+            from datetime import datetime, timedelta
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                return jsonify({'success': False, 'error': 'User not found'})
+            
+            # Get active project statistics (excluding purged and non-active)
+            active_projects_query = Project.query.filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None)
+            )
+            total_active_projects = active_projects_query.count()
+            
+            # Recent active projects (last 30 days)
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            recent_active_projects = Project.query.filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None),
+                Project.created_at >= thirty_days_ago
+            ).count()
+            
+            # Recent active projects list with details (last 10)
+            projects_list = Project.query.filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None)
+            ).order_by(Project.created_at.desc()).limit(10).all()
+            
+            # Additional innovative statistics for RFP system
+            # Completed projects count
+            completed_projects = Project.query.filter(
+                Project.user_id == user.id,
+                Project.status == 'completed',
+                Project.purged_at.is_(None)
+            ).count()
+            
+            # Projects by RFP type
+            rfp_type_stats = db.session.query(
+                Project.rfp_type, 
+                db.func.count(Project.id).label('count')
+            ).filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None)
+            ).group_by(Project.rfp_type).all()
+            
+            # Average completion percentage of active projects
+            avg_completion = db.session.query(
+                db.func.avg(Project.completion_percentage)
+            ).filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None)
+            ).scalar() or 0
+            
+            projects_data = []
+            for project in projects_list:
+                # Get document count for each project
+                doc_count = Document.query.filter_by(project_id=project.id).count()
+                projects_data.append({
+                    'id': project.id,
+                    'name': project.name,
+                    'client_name': project.client_name or 'No client specified',
+                    'created_at': project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'Unknown',
+                    'document_count': doc_count,
+                    'status': project.status,
+                    'rfp_type': project.rfp_type or 'implementation',
+                    'completion_percentage': project.completion_percentage or 0,
+                    'estimated_value': str(project.estimated_value) if project.estimated_value else None,
+                    'currency': project.currency or 'USD',
+                    'priority': project.priority or 'medium'
+                })
+            
+            # Activity count (documents uploaded in last 7 days for active projects)
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            recent_activity = Document.query.join(Project).filter(
+                Project.user_id == user.id,
+                Project.status == 'active',
+                Project.purged_at.is_(None),
+                Document.uploaded_at >= seven_days_ago
+            ).count()
+            
+            # Convert RFP type stats to dictionary
+            rfp_types = {item.rfp_type: item.count for item in rfp_type_stats}
+            
+            return jsonify({
+                'success': True,
+                'stats': {
+                    'active_projects': total_active_projects,
+                    'completed_projects': completed_projects,
+                    'recent_active_projects': recent_active_projects,
+                    'recent_activity': recent_activity,
+                    'avg_completion': round(float(avg_completion), 1),
+                    'rfp_types': rfp_types,
+                    'projects': projects_data,
+                    'last_updated': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+            
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
 
     # ========================================
     # PROJECT MANAGEMENT
@@ -385,14 +500,27 @@ def create_app():
     def post_analysis_page(project_id):
         """Display post-upload analysis page"""
         try:
-            from models import Project
-            from flask_login import current_user
+            from models import User, Project
             
-            # Use Flask-Login's current_user instead of session
-            project = Project.query.filter_by(id=project_id, user_id=current_user.id).first_or_404()
-
+            print(f"Debug: post_analysis_page called with project_id={project_id}")
+            print(f"Debug: session username={session.get('username')}")
+            
+            # Use session-based authentication to match the custom login_required decorator
+            user = User.query.filter_by(username=session['username']).first()
+            if not user:
+                flash('User session invalid', 'error')
+                return redirect('/login')
+                
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first()
+            
+            if not project:
+                flash(f'Project {project_id} not found or access denied', 'error')
+                return redirect('/projects')
+            
+            print(f"Debug: Found project {project.id} - {project.name}")
             return render_template('post_analysis.html', project=project)
         except Exception as e:
+            print(f"Debug: Exception in post_analysis_page: {e}")
             flash(f'Error loading analysis page: {e}', 'error')
             return redirect('/projects')
 
