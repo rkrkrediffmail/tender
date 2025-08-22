@@ -491,7 +491,7 @@ class TemplateProcessor:
             'project_name': project_data.get('name', 'Unnamed Project'),
             'project_description': project_data.get('description', ''),
             'client_name': project_data.get('client_name', 'Valued Client'),
-            'company_name': content_data.get('company_name', 'Your Company'),
+            'company_name': content_data.get('company_name', 'ITSS Global'),
             'contact_person': content_data.get('contact_person', 'Project Manager'),
             'project_date': datetime.now().strftime('%B %d, %Y'),
             'current_date': datetime.now().strftime('%B %d, %Y'),

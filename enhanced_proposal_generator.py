@@ -23,7 +23,7 @@ class EnhancedProposalGenerator(ProposalGenerator):
     Enhanced proposal generator with template support and AI integration
     """
     
-    def __init__(self, project, analysis_results, company_name="Your Company", contact_person="Project Manager"):
+    def __init__(self, project, analysis_results, company_name="ITSS Global", contact_person="Project Manager"):
         super().__init__(project, analysis_results, company_name, contact_person)
         self.template_processor = get_template_processor()
         
@@ -117,7 +117,7 @@ class EnhancedProposalGenerator(ProposalGenerator):
                     bookmark_content=result.get('bookmark_content', {}),
                     generation_metadata={
                         'detail_level': detail_level,
-                        'ai_model': 'claude-3-sonnet-20240229',
+                        'ai_model': 'claude-sonnet-4-20250514',
                         'bookmarks_processed': result.get('bookmarks_processed', 0),
                         'generation_time': datetime.now().isoformat()
                     },
@@ -191,7 +191,7 @@ class EnhancedProposalGenerator(ProposalGenerator):
                     bookmark_content={},
                     generation_metadata={
                         'detail_level': detail_level,
-                        'ai_model': 'claude-3-sonnet-20240229',
+                        'ai_model': 'claude-sonnet-4-20250514',
                         'include_company_info': include_company_info,
                         'generation_time': datetime.now().isoformat()
                     },
@@ -364,7 +364,7 @@ class EnhancedProposalGenerator(ProposalGenerator):
             
             # Generate content with AI
             response = self.client.messages.create(
-                model="claude-3-sonnet-20240229",
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
                 messages=[{"role": "user", "content": formatted_prompt}]
             )
@@ -563,7 +563,7 @@ class EnhancedProposalGenerator(ProposalGenerator):
             return []
 
 # Factory function
-def create_enhanced_proposal_generator(project, analysis_results=None, company_name="Your Company", contact_person="Project Manager") -> EnhancedProposalGenerator:
+def create_enhanced_proposal_generator(project, analysis_results=None, company_name="ITSS Global", contact_person="Project Manager") -> EnhancedProposalGenerator:
     """Create an enhanced proposal generator instance"""
     
     # Get analysis results if not provided

@@ -29,7 +29,7 @@ class BaseAgent:
             }
 
             payload = {
-                "model": "claude-3-sonnet-20240229",
+                "model": "claude-sonnet-4-20250514",
                 "max_tokens": max_tokens,
                 "messages": [
                     {"role": "user", "content": prompt}

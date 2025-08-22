@@ -9,7 +9,7 @@ from real_analysis_system import get_real_analysis_results
 class ProposalGenerator:
     """Advanced proposal generation engine with multiple deliverable types"""
 
-    def __init__(self, project, analysis_results, company_name="Your Company", contact_person="Project Manager"):
+    def __init__(self, project, analysis_results, company_name="ITSS Global", contact_person="Project Manager"):
         self.project = project
         self.analysis_results = analysis_results
         self.company_name = company_name
@@ -113,12 +113,13 @@ class ProposalGenerator:
             - Format as professional business document with clear sections
             - Use markdown formatting for structure
             - Include specific examples and recommendations where applicable
+            - If the tender / RFP document insists of submitting the proposal in a specific format, then include those format / content.
             - Ensure all content is relevant to the project context provided
             """
             
             try:
                 response = self.client.messages.create(
-                    model="claude-3-sonnet-20240229",
+                    model="claude-sonnet-4-20250514",
                     max_tokens=4000,
                     messages=[{"role": "user", "content": full_prompt}]
                 )
@@ -173,7 +174,7 @@ class ProposalGenerator:
 
         **PROJECT:** {self.project.name}
         **CLIENT:** {self.client_name}
-        **BIDDER:** {self.company_name}
+        **BIDDER:** {self.company_name} (Certified Temenos Implementation Partner specializing in BFSI solutions)
 
         **RFP ANALYSIS RESULTS:**
 
@@ -275,7 +276,7 @@ class ProposalGenerator:
 
         **PROJECT:** {self.project.name}
         **CLIENT:** {self.client_name}
-        **BIDDER:** {self.company_name}
+        **BIDDER:** {self.company_name} (Certified Temenos Implementation Partner specializing in BFSI solutions)
 
         **PROJECT REQUIREMENTS:**
         Must-Have Requirements: {len(self.analysis_results.get('must_have_requirements', []))} items
@@ -1276,11 +1277,12 @@ Note: AI analysis service not available. This is a basic template. Please config
         
         # Add guidance for partner integration
         context_parts.append("\n**Partner Integration Instructions:**")
-        context_parts.append("1. For requirements that ITSS/Temenos cannot fully address, recommend relevant partner solutions")
-        context_parts.append("2. Include partner solutions in the 'Partner Solutions' section of the proposal")
-        context_parts.append("3. Explain how partner solutions integrate with core ITSS/Temenos offerings")
-        context_parts.append("4. Highlight the benefits of the combined solution approach")
-        context_parts.append("5. Provide implementation timeline that includes partner coordination")
+        context_parts.append("1. Prioritize Temenos solutions as ITSS Global's strategic platform for core banking")
+        context_parts.append("2. For requirements that ITSS Global/Temenos cannot fully address, recommend relevant vendor solutions")
+        context_parts.append("3. Include vendor solutions in the 'Partner Solutions' section of the proposal")
+        context_parts.append("4. Explain how vendor solutions integrate with core ITSS Global/Temenos offerings")
+        context_parts.append("5. Highlight ITSS Global's BFSI expertise and Temenos partnership benefits")
+        context_parts.append("6. Provide implementation timeline that includes vendor coordination")
         context_parts.append("")
         
         return "\n".join(context_parts)

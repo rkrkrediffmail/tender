@@ -1872,7 +1872,7 @@ def create_app():
             deliverables = data.get('deliverables', [])
             output_format = data.get('output_format', 'pdf')
             detail_level = data.get('detail_level', 'standard')
-            company_name = data.get('company_name', 'Your Company')
+            company_name = data.get('company_name', 'ITSS Global')
             contact_person = data.get('contact_person', 'Project Manager')
             generation_mode = request.args.get('mode', 'standard')
 
@@ -3742,7 +3742,7 @@ def create_app():
             
             # Company information
             company_info = data.get('company_info', {
-                'name': data.get('company_name', 'Your Company'),
+                'name': data.get('company_name', 'ITSS Global'),
                 'contact_person': data.get('contact_person', 'Project Manager'),
                 'address': data.get('company_address', ''),
                 'phone': data.get('company_phone', ''),
@@ -3753,7 +3753,7 @@ def create_app():
             # Create enhanced proposal generator
             generator = create_enhanced_proposal_generator(
                 project=project,
-                company_name=company_info.get('name', 'Your Company'),
+                company_name=company_info.get('name', 'ITSS Global'),
                 contact_person=company_info.get('contact_person', 'Project Manager')
             )
             
@@ -4047,10 +4047,14 @@ def extract_partner_capabilities(website_content: str, partner_name: str) -> dic
         Focus on:
         - Products and services offered
         - Technology solutions and platforms
-        - Industry specializations
+        - BFSI (Banking, Financial Services, Insurance) specializations
+        - Temenos platform integrations and experience
+        - Core banking and financial services capabilities
         - Integration capabilities
         - Key differentiators
         - Technical expertise areas
+        
+        Special attention to BFSI industry experience and Temenos-related capabilities.
 
         Return only valid JSON.
         """

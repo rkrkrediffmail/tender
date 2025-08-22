@@ -376,7 +376,7 @@ class Partner(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
-    company_type = db.Column(db.String(50), default='TECHNOLOGY')  # STRATEGIC, VENDOR, TECHNOLOGY, INTEGRATION
+    company_type = db.Column(db.String(50), default='VENDOR')  # STRATEGIC (Temenos), VENDOR (Others), TECHNOLOGY, INTEGRATION
     status = db.Column(db.String(20), default='ACTIVE')  # ACTIVE, PREFERRED, INACTIVE
     description = db.Column(db.Text)
     website = db.Column(db.String(255))

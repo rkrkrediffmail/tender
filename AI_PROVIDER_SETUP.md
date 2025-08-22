@@ -15,7 +15,7 @@ AI_FALLBACK_ENABLED=true             # Enable automatic fallback (default: true)
 
 # Claude (Anthropic) - Recommended for complex analysis
 ANTHROPIC_API_KEY=your_claude_api_key
-CLAUDE_MODEL=claude-3-sonnet-20240229 # Optional, uses default if not set
+CLAUDE_MODEL=claude-sonnet-4-20250514 # Optional, uses default if not set
 
 # OpenAI GPT - Good for general tasks and speed  
 OPENAI_API_KEY=your_openai_api_key

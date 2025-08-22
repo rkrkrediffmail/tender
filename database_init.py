@@ -113,6 +113,31 @@ def create_default_data():
                 )
                 db.session.add(sample_project)
 
+                # Create Temenos as strategic partner
+                from models import Partner
+                temenos_partner = Partner.query.filter_by(name='Temenos').first()
+                if not temenos_partner:
+                    temenos_partner = Partner(
+                        name='Temenos',
+                        company_type='STRATEGIC',
+                        status='PREFERRED',
+                        description='Strategic partner for core banking and financial services solutions. ITSS Global is a certified Temenos implementation partner.',
+                        website='https://www.temenos.com',
+                        primary_contact='Partnership Manager',
+                        contact_email='partnerships@temenos.com',
+                        revenue_share_percentage=0.0,  # Strategic partnership
+                        discount_level=15.0,  # Preferred partner discount
+                        support_level='ENTERPRISE',
+                        capabilities_summary='Temenos is the world leader in banking software, providing core banking, payments, fund management and wealth management solutions.',
+                        solution_categories=['Core Banking', 'Digital Banking', 'Payments', 'Fund Management', 'Wealth Management', 'Regulatory Compliance'],
+                        technology_stack=['Temenos Transact', 'Temenos Infinity', 'Temenos Fund Administration', 'Cloud Native', 'API First', 'Microservices'],
+                        industry_focus=['Banking', 'Financial Services', 'Insurance', 'FinTech', 'Capital Markets'],
+                        competitive_advantages=['Market Leader', 'Cloud Native', 'API First', 'Proven Implementation', 'Global Presence'],
+                        scrape_status='SUCCESS'
+                    )
+                    db.session.add(temenos_partner)
+                    print("✅ Temenos strategic partner created")
+                
                 db.session.commit()
 
                 print("✅ Default admin user created:")
@@ -120,6 +145,7 @@ def create_default_data():
                 print("   Password: admin123")
                 print("   ⚠️ IMPORTANT: Change password in production!")
                 print("✅ Sample project created")
+                print("✅ Temenos strategic partner configured")
             else:
                 print("✅ Admin user already exists")
 
