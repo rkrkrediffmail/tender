@@ -395,6 +395,20 @@ class Partner(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Website Intelligence Fields
+    website_content = db.Column(db.Text)  # Scraped website content
+    scraped_offerings = db.Column(db.JSON)  # Extracted offerings/services
+    capabilities_summary = db.Column(db.Text)  # AI-generated capabilities summary
+    last_scraped = db.Column(db.DateTime)  # When website was last scraped
+    scrape_status = db.Column(db.String(20), default='PENDING')  # PENDING, SUCCESS, FAILED
+    scrape_error = db.Column(db.Text)  # Error message if scraping failed
+    
+    # AI-Enhanced Fields
+    solution_categories = db.Column(db.JSON)  # Categorized solution offerings
+    technology_stack = db.Column(db.JSON)  # Technologies partner specializes in
+    industry_focus = db.Column(db.JSON)  # Industries partner serves
+    competitive_advantages = db.Column(db.JSON)  # Key differentiators
+
     # Relationships
     products = db.relationship('PartnerProduct', backref='partner', lazy=True, cascade='all, delete-orphan')
 

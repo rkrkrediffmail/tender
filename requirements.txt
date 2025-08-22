@@ -32,6 +32,7 @@ bcrypt==4.1.2
 cryptography==42.0.2
 PyJWT==2.8.0
 requests==2.31.0
+beautifulsoup4==4.12.2
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 
@@ -78,7 +79,7 @@ flask-caching==2.1.0
 
 flask-healthz
 flask-limiter==3.5.0
-
+reportlab
 # Input validation
 marshmallow==3.20.1
 

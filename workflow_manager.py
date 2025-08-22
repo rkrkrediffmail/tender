@@ -4,12 +4,9 @@ Handles workflow transitions, notifications, and approvals
 """
 
 import os
-import smtplib
 import json
 import requests
 from datetime import datetime, timedelta
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
 from typing import List, Dict, Any, Optional
 from models import db, Project, ProjectWorkflowHistory, ProjectStakeholder, NotificationLog, WorkflowStage, RFPTypeConfig
 import logging
@@ -20,18 +17,7 @@ class WorkflowManager:
     """Manages RFP workflow transitions and notifications"""
     
     def __init__(self):
-        self.email_config = self._get_email_config()
-    
-    def _get_email_config(self):
-        """Get email configuration from environment"""
-        return {
-            'smtp_server': os.getenv('SMTP_SERVER', 'smtp.gmail.com'),
-            'smtp_port': int(os.getenv('SMTP_PORT', '587')),
-            'smtp_username': os.getenv('SMTP_USERNAME'),
-            'smtp_password': os.getenv('SMTP_PASSWORD'),
-            'from_email': os.getenv('FROM_EMAIL', os.getenv('SMTP_USERNAME')),
-            'from_name': os.getenv('FROM_NAME', 'RFP Management System')
-        }
+        pass
     
     def get_available_rfp_types(self) -> List[Dict[str, Any]]:
         """Get all available RFP types"""
@@ -99,8 +85,8 @@ class WorkflowManager:
             db.session.add(history)
             db.session.commit()
             
-            # Send notifications
-            self._send_stage_notifications(project, from_stage, to_stage, actor_email, comments)
+            # Send notifications (disabled for now)
+            # self._send_stage_notifications(project, from_stage, to_stage, actor_email, comments)
             
             logger.info(f"Project {project_id} transitioned from {from_stage} to {to_stage} by {actor_email}")
             
@@ -227,161 +213,23 @@ class WorkflowManager:
             for h in history
         ]
     
-    def _send_stage_notifications(self, project: Project, from_stage: str, 
-                                to_stage: str, actor_email: str, comments: str = None):
-        """Send notifications for stage transitions"""
-        try:
-            # Get stakeholders for the new stage
-            stakeholders = ProjectStakeholder.query.filter_by(
-                project_id=project.id,
-                stage=to_stage
-            ).all()
-            
-            if not stakeholders:
-                logger.warning(f"No stakeholders configured for stage {to_stage} in project {project.id}")
-                return
-            
-            # Prepare notification content
-            subject = f"RFP Action Required: {project.name} - {to_stage.title()} Stage"
-            message = self._create_notification_message(project, from_stage, to_stage, actor_email, comments)
-            
-            # Send to each stakeholder
-            for stakeholder in stakeholders:
-                if stakeholder.notification_preference in ['email', 'both']:
-                    self._send_email_notification(stakeholder.email, subject, message, project.id)
-                
-                if stakeholder.notification_preference in ['teams', 'both'] and stakeholder.teams_webhook_url:
-                    self._send_teams_notification(stakeholder.teams_webhook_url, subject, message, project.id)
-            
-        except Exception as e:
-            logger.error(f"Error sending stage notifications: {e}")
+    # Email notifications disabled - remove email dependencies
+    # def _send_stage_notifications(self, project: Project, from_stage: str, 
+    #                             to_stage: str, actor_email: str, comments: str = None):
+    #     """Send notifications for stage transitions - DISABLED"""
+    #     pass
     
-    def _create_notification_message(self, project: Project, from_stage: str, 
-                                   to_stage: str, actor_email: str, comments: str = None) -> str:
-        """Create notification message content"""
-        message = f"""
-RFP Workflow Update
-
-Project: {project.name}
-RFP Type: {project.rfp_type.title()}
-Client: {project.client_name or 'Not specified'}
-
-Status Change: {from_stage.title()} → {to_stage.title()}
-Action taken by: {actor_email}
-Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-"""
-        
-        if comments:
-            message += f"Comments: {comments}\n\n"
-        
-        if to_stage == 'approved':
-            message += "✅ This RFP has been APPROVED and can proceed.\n"
-        elif to_stage == 'rejected':
-            message += "❌ This RFP has been REJECTED.\n"
-        else:
-            message += f"⏳ Action required: This RFP is now awaiting {to_stage} approval.\n"
-        
-        # Add project link (assuming web interface)
-        base_url = os.getenv('BASE_URL', 'http://localhost:5001')
-        message += f"\nView project: {base_url}/project/{project.id}\n"
-        
-        return message
-    
-    def _send_email_notification(self, recipient_email: str, subject: str, 
-                               message: str, project_id: str):
-        """Send email notification"""
-        try:
-            if not self.email_config['smtp_username'] or not self.email_config['smtp_password']:
-                logger.warning("Email not configured - skipping email notification")
-                return
-            
-            msg = MimeMultipart()
-            msg['From'] = f"{self.email_config['from_name']} <{self.email_config['from_email']}>"
-            msg['To'] = recipient_email
-            msg['Subject'] = subject
-            
-            msg.attach(MimeText(message, 'plain'))
-            
-            with smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port']) as server:
-                server.starttls()
-                server.login(self.email_config['smtp_username'], self.email_config['smtp_password'])
-                server.send_message(msg)
-            
-            # Log notification
-            self._log_notification(project_id, recipient_email, 'email', 'stage_change', 
-                                 subject, message, 'sent')
-            
-            logger.info(f"Email sent to {recipient_email}")
-            
-        except Exception as e:
-            logger.error(f"Error sending email to {recipient_email}: {e}")
-            self._log_notification(project_id, recipient_email, 'email', 'stage_change',
-                                 subject, message, 'failed', str(e))
-    
-    def _send_teams_notification(self, webhook_url: str, subject: str, 
-                               message: str, project_id: str):
-        """Send Microsoft Teams notification"""
-        try:
-            # Teams adaptive card format
-            card = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "0076D7",
-                "summary": subject,
-                "sections": [{
-                    "activityTitle": subject,
-                    "activitySubtitle": "RFP Management System",
-                    "activityImage": "https://adaptivecards.io/content/cats/1.png",  # Replace with your logo
-                    "facts": [
-                        {"name": "Type", "value": "RFP Workflow Update"},
-                        {"name": "Time", "value": datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                    ],
-                    "text": message
-                }],
-                "potentialAction": [{
-                    "@type": "OpenUri",
-                    "name": "View Project",
-                    "targets": [{"os": "default", "uri": f"{os.getenv('BASE_URL', 'http://localhost:5001')}/project/{project_id}"}]
-                }]
-            }
-            
-            response = requests.post(webhook_url, json=card, timeout=10)
-            response.raise_for_status()
-            
-            # Log notification
-            self._log_notification(project_id, webhook_url, 'teams', 'stage_change',
-                                 subject, message, 'sent')
-            
-            logger.info(f"Teams notification sent to webhook")
-            
-        except Exception as e:
-            logger.error(f"Error sending Teams notification: {e}")
-            self._log_notification(project_id, webhook_url, 'teams', 'stage_change',
-                                 subject, message, 'failed', str(e))
-    
-    def _log_notification(self, project_id: str, recipient: str, notification_type: str,
-                         event_type: str, subject: str, message: str, 
-                         status: str, error_message: str = None):
-        """Log notification attempt"""
-        try:
-            log_entry = NotificationLog(
-                project_id=project_id,
-                recipient_email=recipient,
-                notification_type=notification_type,
-                event_type=event_type,
-                subject=subject,
-                message=message,
-                status=status,
-                error_message=error_message,
-                sent_at=datetime.utcnow() if status == 'sent' else None
-            )
-            
-            db.session.add(log_entry)
-            db.session.commit()
-            
-        except Exception as e:
-            logger.error(f"Error logging notification: {e}")
+    # Teams and email notifications disabled
+    # def _send_teams_notification(self, webhook_url: str, subject: str, 
+    #                            message: str, project_id: str):
+    #     """Send Microsoft Teams notification - DISABLED"""
+    #     pass
+    # 
+    # def _log_notification(self, project_id: str, recipient: str, notification_type: str,
+    #                      event_type: str, subject: str, message: str, 
+    #                      status: str, error_message: str = None):
+    #     """Log notification attempt - DISABLED"""
+    #     pass
 
 # Global workflow manager instance
 workflow_manager = WorkflowManager()

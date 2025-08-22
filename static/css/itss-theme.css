@@ -44,7 +44,7 @@ h1, h2, h3, h4, h5, h6 {
 .navbar-itss .navbar-brand {
     font-family: var(--itss-font-headings);
     font-weight: 600;
-    font-size: 1.25rem;
+    font-size: 1.06rem;
 }
 
 .navbar-itss .nav-link {
@@ -79,7 +79,7 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
     border-radius: var(--itss-border-radius);
     transition: all 0.3s ease;
-    padding: 0.5rem 1.5rem;
+    padding: 0.43rem 1.28rem;
 }
 
 .btn-itss-primary:hover {
@@ -97,7 +97,7 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
     border-radius: var(--itss-border-radius);
     transition: all 0.3s ease;
-    padding: 0.5rem 1.5rem;
+    padding: 0.43rem 1.28rem;
 }
 
 .btn-itss-secondary:hover {
@@ -115,7 +115,7 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
     border-radius: var(--itss-border-radius);
     transition: all 0.3s ease;
-    padding: 0.5rem 1.5rem;
+    padding: 0.43rem 1.28rem;
 }
 
 .btn-outline-itss:hover {
@@ -149,11 +149,11 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Status Indicators */
 .status-indicator {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     display: inline-block;
-    margin-right: 8px;
+    margin-right: 7px;
 }
 
 .status-good { background-color: var(--itss-success); }
@@ -255,7 +255,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .itss-icon {
     color: var(--itss-accent);
-    font-size: 2rem;
+    font-size: 1.7rem;
 }
 
 .itss-divider {
@@ -267,11 +267,11 @@ h1, h2, h3, h4, h5, h6 {
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .navbar-itss .navbar-brand {
-        font-size: 1.1rem;
+        font-size: 0.94rem;
     }
     
     .navbar-itss .navbar-brand img {
-        height: 35px !important;
+        height: 30px !important;
     }
 }
 

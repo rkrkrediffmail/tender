@@ -156,11 +156,18 @@ class ProposalGenerator:
         }
 
     def _generate_technical_proposal(self, detail_level: str) -> str:
-        """Generate comprehensive technical proposal"""
+        """Generate comprehensive technical proposal with past proposal intelligence"""
 
         if not self.client:
             return self._fallback_technical_proposal()
 
+        # Get relevant past proposals for technical content
+        past_proposal_insights = self._get_past_proposal_insights("technical")
+        
+        # Get relevant partner solutions
+        partner_solutions = self._get_partner_solutions()
+        
+        # Build enhanced prompt with past proposal content and partner solutions
         prompt = f"""
         You are a Senior Technical Architect creating a comprehensive technical proposal for:
 
@@ -180,6 +187,10 @@ class ProposalGenerator:
         - Timeline: {self.analysis_results.get('project_details', {}).get('timeline', 'To be determined')}
         - Budget: {self.analysis_results.get('project_details', {}).get('budget', 'To be determined')}
         - Evaluation: {self.analysis_results.get('project_details', {}).get('evaluation_criteria', 'Standard criteria')}
+
+        {self._format_past_proposal_context(past_proposal_insights)}
+
+        {self._format_partner_solutions_context(partner_solutions)}
 
         Generate a comprehensive technical proposal with the following structure:
 
@@ -248,10 +259,16 @@ class ProposalGenerator:
             return self._fallback_technical_proposal()
 
     def _generate_commercial_proposal(self, detail_level: str) -> str:
-        """Generate comprehensive commercial proposal"""
+        """Generate comprehensive commercial proposal with past proposal intelligence"""
 
         if not self.client:
             return self._fallback_commercial_proposal()
+
+        # Get relevant past commercial proposals
+        past_proposal_insights = self._get_past_proposal_insights("commercial")
+        
+        # Get relevant partner solutions for commercial considerations
+        partner_solutions = self._get_partner_solutions()
 
         prompt = f"""
         You are a Commercial Director creating a compelling commercial proposal for:
@@ -268,6 +285,10 @@ class ProposalGenerator:
         **PROJECT DETAILS:**
         - Timeline: {self.analysis_results.get('project_details', {}).get('timeline', 'To be determined')}
         - Budget Context: {self.analysis_results.get('project_details', {}).get('budget', 'Competitive pricing required')}
+
+        {self._format_past_proposal_context(past_proposal_insights)}
+
+        {self._format_partner_solutions_context(partner_solutions)}
 
         Generate a comprehensive commercial proposal with this structure:
 
@@ -1141,4 +1162,125 @@ Note: AI analysis service not available. This is a basic template. Please config
         if details.get('key_stakeholders'):
             formatted.append(f"**Key Stakeholders:** {details['key_stakeholders']}")
         
-        return "\n".join(formatted) if formatted else "Standard project details apply."
+        return "\n".join(formatted)
+
+    def _get_past_proposal_insights(self, proposal_type: str) -> Dict[str, Any]:
+        """Get relevant past proposal insights for the current proposal type"""
+        try:
+            from proposal_manager import get_proposal_manager
+            
+            proposal_manager = get_proposal_manager()
+            insights = proposal_manager.get_relevant_past_proposals(
+                analysis_results=self.analysis_results,
+                proposal_type=proposal_type,
+                limit=8
+            )
+            
+            return insights
+            
+        except Exception as e:
+            print(f"Warning: Could not retrieve past proposal insights: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _format_past_proposal_context(self, insights: Dict[str, Any]) -> str:
+        """Format past proposal insights for inclusion in AI prompt"""
+        if not insights.get('success') or not insights.get('reusable_content'):
+            return ""
+        
+        context_parts = [
+            "\n**RELEVANT PAST PROPOSAL INSIGHTS:**",
+            f"**Confidence Score:** {insights.get('confidence_score', 0):.0%}",
+            f"**Found Proposals:** {insights.get('found_proposals', 0)} relevant past proposals"
+        ]
+        
+        reusable_content = insights.get('reusable_content', {})
+        
+        # Add technical approach examples
+        if reusable_content.get('technical_approach'):
+            context_parts.append("\n**Past Technical Approaches:**")
+            for i, content in enumerate(reusable_content['technical_approach'][:2], 1):
+                context_parts.append(f"Example {i}: {content['content'][:400]}...")
+        
+        # Add implementation methodology examples
+        if reusable_content.get('implementation_methodology'):
+            context_parts.append("\n**Past Implementation Methodologies:**")
+            for i, content in enumerate(reusable_content['implementation_methodology'][:2], 1):
+                context_parts.append(f"Approach {i}: {content['content'][:400]}...")
+        
+        # Add team expertise examples
+        if reusable_content.get('team_expertise'):
+            context_parts.append("\n**Past Team Expertise Examples:**")
+            for i, content in enumerate(reusable_content['team_expertise'][:2], 1):
+                context_parts.append(f"Experience {i}: {content['content'][:400]}...")
+        
+        # Add recommendations
+        recommendations = insights.get('recommendations', [])
+        if recommendations:
+            context_parts.append("\n**Usage Recommendations:**")
+            for rec in recommendations[:3]:
+                context_parts.append(f"• {rec.get('section', '')}: {rec.get('recommendation', '')}")
+        
+        context_parts.append("\n**Instructions:** Leverage the above past proposal examples to:")
+        context_parts.append("1. Adapt proven successful approaches to current requirements")
+        context_parts.append("2. Use similar language and structure where appropriate")
+        context_parts.append("3. Build on successful technical solutions from past wins")
+        context_parts.append("4. Ensure all content is properly customized for the current RFP")
+        context_parts.append("")
+        
+        return "\n".join(context_parts)
+
+    def _get_partner_solutions(self) -> Dict[str, Any]:
+        """Get relevant partner solutions for current requirements"""
+        try:
+            # Import here to avoid circular imports
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+            
+            # Use the function from main.py
+            from main import get_partner_solutions_for_requirements
+            
+            partner_solutions = get_partner_solutions_for_requirements(self.analysis_results)
+            return partner_solutions
+            
+        except Exception as e:
+            print(f"Warning: Could not retrieve partner solutions: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def _format_partner_solutions_context(self, partner_solutions: Dict[str, Any]) -> str:
+        """Format partner solutions for inclusion in AI prompt"""
+        if not partner_solutions.get('success') or not partner_solutions.get('partner_solutions'):
+            return ""
+        
+        solutions = partner_solutions.get('partner_solutions', [])
+        context_parts = [
+            "\n**RELEVANT PARTNER SOLUTIONS:**",
+            f"**Evaluated Partners:** {partner_solutions.get('total_partners_evaluated', 0)}",
+            f"**Recommended Solutions:** {len(solutions)}"
+        ]
+        
+        for i, solution in enumerate(solutions[:3], 1):  # Top 3 partner solutions
+            partner = solution['partner']
+            matches = solution['matches']
+            
+            context_parts.append(f"\n**Partner Solution {i}: {partner['name']}**")
+            context_parts.append(f"Website: {partner['website']}")
+            context_parts.append(f"Capabilities: {partner['summary'][:200]}...")
+            context_parts.append(f"Relevance Score: {matches['total_score']:.0%}")
+            
+            if matches['matching_offerings']:
+                context_parts.append(f"Addresses: {', '.join(matches['matching_offerings'][:3])}")
+            
+            context_parts.append(f"Integration: {solution['recommended_integration']}")
+            context_parts.append(f"Effort: {solution['estimated_effort']}")
+        
+        # Add guidance for partner integration
+        context_parts.append("\n**Partner Integration Instructions:**")
+        context_parts.append("1. For requirements that ITSS/Temenos cannot fully address, recommend relevant partner solutions")
+        context_parts.append("2. Include partner solutions in the 'Partner Solutions' section of the proposal")
+        context_parts.append("3. Explain how partner solutions integrate with core ITSS/Temenos offerings")
+        context_parts.append("4. Highlight the benefits of the combined solution approach")
+        context_parts.append("5. Provide implementation timeline that includes partner coordination")
+        context_parts.append("")
+        
+        return "\n".join(context_parts)

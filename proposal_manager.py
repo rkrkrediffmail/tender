@@ -184,14 +184,18 @@ class ProposalManager:
             db.session.add(proposal)
             db.session.commit()
             
-            # Add to vector store if content was extracted
+            # Add to vector store with proposal-type specific collection
             vector_success = False
             if extracted_content and self.vector_store:
+                # Use separate collection based on proposal type
+                collection_name = f"past_proposal_{proposal.proposal_type}"
+                
                 vector_metadata = {
                     "proposal_id": proposal.proposal_id,
                     "title": proposal.title,
                     "client_name": proposal.client_name,
                     "project_type": proposal.project_type,
+                    "proposal_type": proposal.proposal_type,
                     "submission_year": proposal.submission_year,
                     "status": proposal.status,
                     "technologies": proposal.technologies_used,
@@ -199,11 +203,17 @@ class ProposalManager:
                     "proposal_value": proposal.proposal_value
                 }
                 
-                vector_success = self.vector_store.add_proposal_document(
-                    content=extracted_content,
-                    metadata=vector_metadata,
-                    document_type=proposal.proposal_type
-                )
+                try:
+                    # Store in collection specific to proposal type
+                    vector_success = self.vector_store.add_proposal_document(
+                        content=extracted_content,
+                        metadata=vector_metadata,
+                        document_type=proposal.proposal_type,
+                        collection_name=collection_name
+                    )
+                except Exception as e:
+                    logger.warning(f"Vector storage failed: {e}")
+                    vector_success = False
                 
                 if vector_success:
                     proposal.vector_stored = True
@@ -409,6 +419,268 @@ class ProposalManager:
         except Exception as e:
             logger.error(f"Error getting proposal statistics: {e}")
             return {"error": str(e)}
+    
+    def get_relevant_past_proposals(self, analysis_results: Dict[str, Any], proposal_type: str = "technical", limit: int = 10) -> Dict[str, Any]:
+        """
+        Automatically retrieve relevant past proposals based on current RFP analysis
+        This is the main intelligence function that replaces manual search
+        """
+        try:
+            logger.info(f"Getting relevant past proposals for {proposal_type} proposal")
+            
+            # Extract search context from analysis results
+            search_context = self._extract_search_context(analysis_results)
+            
+            # Get collection name for specific proposal type
+            collection_name = f"past_proposal_{proposal_type}"
+            
+            # Retrieve relevant proposals using semantic search
+            relevant_proposals = []
+            
+            if self.vector_store:
+                # Search by requirements
+                for requirement in search_context.get('key_requirements', [])[:5]:
+                    try:
+                        results = self.vector_store.similarity_search(
+                            query=requirement,
+                            k=3,
+                            collection_name=collection_name,
+                            filter_criteria={
+                                'proposal_type': proposal_type,
+                                'status': 'won'  # Prioritize successful proposals
+                            }
+                        )
+                        relevant_proposals.extend(results)
+                    except Exception as e:
+                        logger.warning(f"Search failed for requirement: {e}")
+                
+                # Search by industry/project type
+                if search_context.get('industry') or search_context.get('project_type'):
+                    industry_query = f"{search_context.get('industry', '')} {search_context.get('project_type', '')} project"
+                    try:
+                        industry_results = self.vector_store.similarity_search(
+                            query=industry_query.strip(),
+                            k=5,
+                            collection_name=collection_name,
+                            filter_criteria={
+                                'industry_sector': search_context.get('industry'),
+                                'project_type': search_context.get('project_type')
+                            }
+                        )
+                        relevant_proposals.extend(industry_results)
+                    except Exception as e:
+                        logger.warning(f"Industry search failed: {e}")
+            
+            # Remove duplicates and rank by relevance
+            unique_proposals = self._deduplicate_and_rank(relevant_proposals, search_context)
+            
+            # Extract reusable content sections
+            reusable_content = self._extract_reusable_content(unique_proposals[:limit], search_context)
+            
+            return {
+                'success': True,
+                'found_proposals': len(unique_proposals),
+                'relevant_proposals': unique_proposals[:limit],
+                'reusable_content': reusable_content,
+                'search_context': search_context,
+                'recommendations': self._generate_usage_recommendations(reusable_content),
+                'confidence_score': self._calculate_confidence(unique_proposals, search_context)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting relevant past proposals: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _extract_search_context(self, analysis_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract search context from current RFP analysis"""
+        context = {
+            'key_requirements': [],
+            'technologies': [],
+            'industry': None,
+            'project_type': None,
+            'search_terms': []
+        }
+        
+        try:
+            # Extract from different analysis components
+            if isinstance(analysis_results, dict):
+                # From requirements
+                if analysis_results.get('must_have_requirements'):
+                    context['key_requirements'] = analysis_results['must_have_requirements'][:10]
+                
+                # From technical specs
+                if analysis_results.get('technical_specifications'):
+                    for spec in analysis_results['technical_specifications'][:5]:
+                        context['search_terms'].extend(self._extract_keywords(spec))
+                
+                # From project context
+                context['industry'] = analysis_results.get('industry_sector', '')
+                context['project_type'] = analysis_results.get('project_type', '')
+                context['technologies'] = analysis_results.get('technologies', [])
+        
+        except Exception as e:
+            logger.error(f"Error extracting search context: {e}")
+        
+        return context
+    
+    def _extract_keywords(self, text: str) -> List[str]:
+        """Extract relevant keywords from text"""
+        if not text or not isinstance(text, str):
+            return []
+        
+        keywords = []
+        
+        # Common technical terms to look for
+        tech_terms = [
+            'API', 'REST', 'database', 'cloud', 'AWS', 'Azure', 'security', 'integration',
+            'architecture', 'framework', 'platform', 'system', 'solution', 'infrastructure',
+            'microservices', 'docker', 'kubernetes', 'python', 'java', 'react', 'angular',
+            'machine learning', 'AI', 'blockchain', 'IoT', 'mobile', 'web', 'dashboard'
+        ]
+        
+        text_lower = text.lower()
+        for term in tech_terms:
+            if term.lower() in text_lower:
+                keywords.append(term)
+        
+        # Extract capitalized words (likely important terms)
+        words = text.split()
+        for word in words:
+            if word.isalpha() and len(word) > 3 and word[0].isupper():
+                keywords.append(word)
+        
+        return list(set(keywords))[:10]  # Return top 10 unique keywords
+    
+    def _deduplicate_and_rank(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Remove duplicates and rank by relevance"""
+        # Deduplicate by proposal_id
+        seen_ids = set()
+        unique_proposals = []
+        
+        for proposal in proposals:
+            proposal_id = proposal.get('metadata', {}).get('proposal_id') or proposal.get('proposal_id')
+            if proposal_id and proposal_id not in seen_ids:
+                unique_proposals.append(proposal)
+                seen_ids.add(proposal_id)
+        
+        # Rank by relevance
+        for proposal in unique_proposals:
+            score = proposal.get('similarity_score', 0.5)
+            metadata = proposal.get('metadata', {})
+            
+            # Boost successful proposals
+            if metadata.get('status') == 'won':
+                score += 0.3
+            
+            # Boost industry match
+            if metadata.get('industry_sector') == context.get('industry'):
+                score += 0.2
+            
+            # Boost project type match  
+            if metadata.get('project_type') == context.get('project_type'):
+                score += 0.15
+            
+            # Boost recent proposals
+            if metadata.get('submission_year', 0) >= 2020:
+                score += 0.1
+            
+            proposal['relevance_score'] = min(1.0, score)
+        
+        return sorted(unique_proposals, key=lambda x: x.get('relevance_score', 0), reverse=True)
+    
+    def _extract_reusable_content(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract reusable content sections from past proposals"""
+        sections = {
+            'technical_approach': [],
+            'solution_architecture': [],
+            'implementation_methodology': [],
+            'quality_assurance': [],
+            'team_expertise': [],
+            'similar_experience': [],
+            'risk_mitigation': []
+        }
+        
+        for proposal in proposals:
+            content = proposal.get('page_content', '') or proposal.get('content', '')
+            if not content:
+                continue
+            
+            # Simple section identification based on keywords
+            content_lower = content.lower()
+            
+            # Technical approach
+            if any(keyword in content_lower for keyword in ['technical approach', 'solution design', 'methodology']):
+                sections['technical_approach'].append({
+                    'content': content[:800],  # Limit content length
+                    'source': proposal.get('metadata', {}),
+                    'confidence': proposal.get('relevance_score', 0.5)
+                })
+            
+            # Implementation methodology
+            if any(keyword in content_lower for keyword in ['implementation', 'delivery', 'project phases']):
+                sections['implementation_methodology'].append({
+                    'content': content[:800],
+                    'source': proposal.get('metadata', {}),
+                    'confidence': proposal.get('relevance_score', 0.5)
+                })
+            
+            # Team expertise
+            if any(keyword in content_lower for keyword in ['team', 'expertise', 'experience', 'qualifications']):
+                sections['team_expertise'].append({
+                    'content': content[:800],
+                    'source': proposal.get('metadata', {}),
+                    'confidence': proposal.get('relevance_score', 0.5)
+                })
+        
+        # Limit and sort sections by confidence
+        for section_name in sections:
+            sections[section_name] = sorted(
+                sections[section_name], 
+                key=lambda x: x.get('confidence', 0), 
+                reverse=True
+            )[:3]  # Top 3 per section
+        
+        return sections
+    
+    def _generate_usage_recommendations(self, reusable_content: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Generate recommendations for using past proposal content"""
+        recommendations = []
+        
+        for section_name, content_list in reusable_content.items():
+            if content_list:
+                recommendations.append({
+                    'section': section_name.replace('_', ' ').title(),
+                    'recommendation': f"Found {len(content_list)} relevant examples for {section_name.replace('_', ' ')}",
+                    'action': 'Integrate key concepts and adapt language to current RFP',
+                    'confidence': 'high' if len(content_list) >= 2 else 'medium'
+                })
+        
+        if len([r for r in recommendations if r['confidence'] == 'high']) >= 3:
+            recommendations.insert(0, {
+                'section': 'Overall',
+                'recommendation': 'Strong past proposal foundation available',
+                'action': 'Leverage extensively with proper adaptation',
+                'confidence': 'high'
+            })
+        
+        return recommendations
+    
+    def _calculate_confidence(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> float:
+        """Calculate confidence score for past proposal recommendations"""
+        if not proposals:
+            return 0.0
+        
+        base_score = min(0.8, len(proposals) * 0.08)  # Base from quantity
+        
+        # Boost for high relevance scores
+        avg_relevance = sum(p.get('relevance_score', 0) for p in proposals) / len(proposals)
+        base_score += avg_relevance * 0.3
+        
+        # Boost for won proposals
+        won_count = len([p for p in proposals if p.get('metadata', {}).get('status') == 'won'])
+        base_score += (won_count / len(proposals)) * 0.2
+        
+        return min(1.0, base_score)
 
 # Singleton instance
 proposal_manager_instance = None

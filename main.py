@@ -1327,7 +1327,20 @@ def create_app():
             db.session.add(partner)
             db.session.commit()
 
-            flash('Partner added successfully!', 'success')
+            # Automatically scrape partner website for capabilities
+            if partner.website:
+                try:
+                    scrape_result = scrape_partner_website(partner.id)
+                    if scrape_result.get('success'):
+                        flash(f'Partner added successfully! Found {scrape_result.get("offerings_found", 0)} offerings.', 'success')
+                    else:
+                        flash('Partner added successfully! Website scraping will be attempted later.', 'warning')
+                except Exception as e:
+                    print(f"Website scraping failed: {e}")
+                    flash('Partner added successfully! Website scraping will be attempted later.', 'warning')
+            else:
+                flash('Partner added successfully!', 'success')
+                
             return redirect('/settings/partners')
 
         except Exception as e:
@@ -1502,6 +1515,13 @@ def create_app():
         except Exception as e:
             flash(f"Error loading project: {e}")
             return redirect('/projects')
+
+    @app.route('/proposals')
+    @app.route('/proposals/')
+    @login_required
+    def proposals_redirect():
+        """Redirect to past proposals page"""
+        return redirect('/past-proposals')
 
     @app.route('/proposals/<project_id>')
     @login_required
@@ -3143,8 +3163,22 @@ def create_app():
             partners = Partner.query.all()
             return render_template('admin/partners.html', partners=partners)
         except Exception as e:
-            flash(f'Error loading partners: {e}')
-            return redirect('/projects')
+            print(f"Error loading partners: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f'Error loading partners: {e}', 'error')
+            # Return empty partners list instead of redirecting
+            return render_template('admin/partners.html', partners=[])
+    
+    @app.route('/api/partners/<int:partner_id>/scrape', methods=['POST'])
+    @login_required
+    def api_scrape_partner(partner_id):
+        """Manually trigger partner website scraping"""
+        try:
+            result = scrape_partner_website(partner_id)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
 
     # =============================================================================
     # PROJECT LIFECYCLE MANAGEMENT - Purge/Restore Functionality
@@ -3848,6 +3882,338 @@ def create_app():
 # Create application instance (simplified - no background task queue)
 app = create_app()
 print("✅ ITSS RFPplus started without background task queue (simplified deployment)")
+
+# ========================================
+# PARTNER INTELLIGENCE FUNCTIONS
+# ========================================
+
+def scrape_partner_website(partner_id: int) -> dict:
+    """Automatically scrape partner website and extract offering information"""
+    try:
+        from models import Partner
+        
+        partner = Partner.query.get(partner_id)
+        if not partner or not partner.website:
+            return {'success': False, 'error': 'Partner or website not found'}
+        
+        print(f"🔍 Scraping website for {partner.name}: {partner.website}")
+        
+        # Step 1: Scrape website content
+        website_content = scrape_website_content(partner.website)
+        if not website_content['success']:
+            partner.scrape_status = 'FAILED'
+            partner.scrape_error = website_content['error']
+            db.session.commit()
+            return website_content
+        
+        # Step 2: Extract structured information using AI
+        extraction_result = extract_partner_capabilities(website_content['content'], partner.name)
+        
+        if extraction_result['success']:
+            # Update partner with scraped information
+            partner.website_content = website_content['content'][:50000]  # Limit size
+            partner.scraped_offerings = extraction_result['offerings']
+            partner.capabilities_summary = extraction_result['summary']
+            partner.solution_categories = extraction_result['solution_categories']
+            partner.technology_stack = extraction_result['technology_stack']
+            partner.industry_focus = extraction_result['industry_focus']
+            partner.competitive_advantages = extraction_result['competitive_advantages']
+            partner.scrape_status = 'SUCCESS'
+            partner.last_scraped = datetime.utcnow()
+            partner.scrape_error = None
+            
+            # Step 3: Auto-generate partner products if none exist
+            if not partner.products:
+                auto_generate_partner_products(partner, extraction_result)
+            
+            db.session.commit()
+            
+            print(f"✅ Successfully scraped {partner.name}: {len(extraction_result['offerings'])} offerings found")
+            
+            return {
+                'success': True,
+                'partner_id': partner_id,
+                'offerings_found': len(extraction_result['offerings']),
+                'categories': extraction_result['solution_categories'],
+                'summary': extraction_result['summary']
+            }
+        else:
+            partner.scrape_status = 'FAILED'
+            partner.scrape_error = extraction_result['error']
+            db.session.commit()
+            return extraction_result
+            
+    except Exception as e:
+        print(f"❌ Error scraping partner website: {e}")
+        return {'success': False, 'error': str(e)}
+
+def scrape_website_content(website_url: str) -> dict:
+    """Scrape website content using requests and BeautifulSoup"""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        # Normalize URL
+        if not website_url.startswith(('http://', 'https://')):
+            website_url = 'https://' + website_url
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(website_url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        # Parse HTML and extract text
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
+        
+        # Extract main content areas
+        content_areas = []
+        
+        # Look for main content sections
+        main_selectors = [
+            'main', '[role="main"]', '.main', '#main',
+            '.content', '#content', '.container',
+            'article', '.article', '.post',
+            '.services', '.products', '.solutions',
+            '.about', '.capabilities', '.offerings'
+        ]
+        
+        for selector in main_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                text = element.get_text(strip=True)
+                if len(text) > 100:  # Only meaningful content
+                    content_areas.append(text)
+        
+        # If no main content found, get all text
+        if not content_areas:
+            content_areas = [soup.get_text(strip=True)]
+        
+        full_content = ' '.join(content_areas)
+        
+        # Limit content size
+        if len(full_content) > 100000:
+            full_content = full_content[:100000]
+        
+        return {
+            'success': True,
+            'content': full_content,
+            'url': website_url
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Website scraping failed: {str(e)}",
+            'url': website_url
+        }
+
+def extract_partner_capabilities(website_content: str, partner_name: str) -> dict:
+    """Use AI to extract structured information from website content"""
+    try:
+        import anthropic
+        
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        if not anthropic_key:
+            return {'success': False, 'error': 'AI API key not available'}
+        
+        client = anthropic.Anthropic(api_key=anthropic_key)
+        
+        prompt = f"""
+        Analyze the following website content for {partner_name} and extract structured information about their capabilities, offerings, and solutions.
+
+        Website Content:
+        {website_content[:10000]}
+
+        Please extract and structure the following information in JSON format:
+
+        {{
+            "offerings": [
+                {{"name": "Service/Product Name", "description": "Brief description", "category": "Category"}},
+                ...
+            ],
+            "solution_categories": ["Category1", "Category2", ...],
+            "technology_stack": ["Technology1", "Technology2", ...],
+            "industry_focus": ["Industry1", "Industry2", ...],
+            "competitive_advantages": ["Advantage1", "Advantage2", ...],
+            "summary": "2-3 sentence summary of partner's main capabilities and focus areas"
+        }}
+
+        Focus on:
+        - Products and services offered
+        - Technology solutions and platforms
+        - Industry specializations
+        - Integration capabilities
+        - Key differentiators
+        - Technical expertise areas
+
+        Return only valid JSON.
+        """
+        
+        response = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        # Parse AI response
+        ai_content = response.content[0].text.strip()
+        
+        # Extract JSON from response
+        import re
+        import json
+        json_match = re.search(r'\{.*\}', ai_content, re.DOTALL)
+        if json_match:
+            extracted_data = json.loads(json_match.group())
+            
+            return {
+                'success': True,
+                'offerings': extracted_data.get('offerings', []),
+                'solution_categories': extracted_data.get('solution_categories', []),
+                'technology_stack': extracted_data.get('technology_stack', []),
+                'industry_focus': extracted_data.get('industry_focus', []),
+                'competitive_advantages': extracted_data.get('competitive_advantages', []),
+                'summary': extracted_data.get('summary', '')
+            }
+        else:
+            return {'success': False, 'error': 'Could not extract structured data from AI response'}
+            
+    except Exception as e:
+        return {'success': False, 'error': f"AI extraction failed: {str(e)}"}
+
+def auto_generate_partner_products(partner, extraction_result: dict):
+    """Automatically generate PartnerProduct entries from scraped data"""
+    try:
+        from models import PartnerProduct
+        
+        offerings = extraction_result.get('offerings', [])
+        
+        for offering in offerings[:10]:  # Limit to 10 products
+            # Create PartnerProduct entry
+            product = PartnerProduct(
+                partner_id=partner.id,
+                product_name=offering.get('name', 'Unknown Product'),
+                category=offering.get('category', 'GENERAL'),
+                functionality=offering.get('description', ''),
+                integration_complexity='MEDIUM',  # Default
+                api_available=True,  # Assume modern partners have APIs
+                cloud_native=True,  # Modern assumption
+                supported_platforms=['web', 'api'],  # Default platforms
+                pricing_type='SUBSCRIPTION',  # Default pricing
+                created_at=datetime.utcnow()
+            )
+            
+            db.session.add(product)
+        
+        print(f"✅ Generated {len(offerings)} products for {partner.name}")
+                      
+    except Exception as e:
+        print(f"❌ Error generating products: {e}")
+
+def get_partner_solutions_for_requirements(analysis_results: dict) -> dict:
+    """Find partner solutions that can address current requirements"""
+    try:
+        from models import Partner
+        
+        # Extract requirements from analysis
+        requirements = analysis_results.get('must_have_requirements', [])
+        unmet_capabilities = analysis_results.get('gaps', [])
+        
+        # Get all partners with successful scrapes
+        partners = Partner.query.filter_by(scrape_status='SUCCESS').all()
+        
+        partner_solutions = []
+        
+        for partner in partners:
+            # Match partner capabilities to requirements
+            matches = match_partner_to_requirements(partner, requirements, unmet_capabilities)
+            
+            if matches['total_score'] > 0.3:  # Minimum relevance threshold
+                partner_solutions.append({
+                    'partner': {
+                        'id': partner.id,
+                        'name': partner.name,
+                        'website': partner.website,
+                        'summary': partner.capabilities_summary
+                    },
+                    'matches': matches,
+                    'recommended_integration': suggest_integration_approach(matches),
+                    'estimated_effort': estimate_integration_effort(matches)
+                })
+        
+        # Sort by relevance score
+        partner_solutions.sort(key=lambda x: x['matches']['total_score'], reverse=True)
+        
+        return {
+            'success': True,
+            'partner_solutions': partner_solutions[:5],  # Top 5 matches
+            'total_partners_evaluated': len(partners)
+        }
+        
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def match_partner_to_requirements(partner, requirements: list, unmet_capabilities: list) -> dict:
+    """Calculate how well a partner matches current requirements"""
+    total_score = 0.0
+    matching_offerings = []
+    
+    partner_content = (partner.capabilities_summary or '') + ' ' + str(partner.scraped_offerings or [])
+    
+    # Check each requirement
+    for req in requirements:
+        req_lower = req.lower()
+        if any(keyword in partner_content.lower() for keyword in req_lower.split()):
+            total_score += 0.2
+            matching_offerings.append(req)
+    
+    # Check unmet capabilities
+    for capability in unmet_capabilities:
+        cap_lower = capability.lower()
+        if any(keyword in partner_content.lower() for keyword in cap_lower.split()):
+            total_score += 0.3  # Higher weight for addressing gaps
+            matching_offerings.append(f"Gap: {capability}")
+    
+    # Bonus for solution categories match
+    solution_categories = partner.solution_categories or []
+    for category in solution_categories:
+        if any(keyword in ' '.join(requirements).lower() for keyword in category.lower().split()):
+            total_score += 0.1
+    
+    return {
+        'total_score': min(1.0, total_score),
+        'matching_offerings': matching_offerings,
+        'solution_categories': solution_categories,
+        'technology_stack': partner.technology_stack or []
+    }
+
+def suggest_integration_approach(matches: dict) -> str:
+    """Suggest how to integrate partner solution"""
+    score = matches['total_score']
+    
+    if score > 0.7:
+        return "Core Integration - Partner solution addresses critical requirements"
+    elif score > 0.5:
+        return "Strategic Add-on - Partner enhances core solution capabilities"
+    else:
+        return "Optional Enhancement - Partner provides additional value"
+
+def estimate_integration_effort(matches: dict) -> str:
+    """Estimate integration effort based on matching score"""
+    score = matches['total_score']
+    offerings_count = len(matches['matching_offerings'])
+    
+    if score > 0.7 and offerings_count > 3:
+        return "High (6-12 weeks) - Comprehensive integration required"
+    elif score > 0.5:
+        return "Medium (3-6 weeks) - Moderate integration complexity"
+    else:
+        return "Low (1-3 weeks) - Simple integration or configuration"
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
