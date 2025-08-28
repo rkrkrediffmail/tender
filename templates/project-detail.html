@@ -1,9 +1,12 @@
         <!DOCTYPE html>
         <html>
         <head>
+            <title>{{ project.name }} - Project Details</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/itss-theme.css" rel="stylesheet">
-            <title>{{ project.name }} - Project Details</title>
             <style>
                 body { font-family: 'Poppins', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
                 .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
@@ -42,6 +45,7 @@
                         <a href="/projects" class="btn">← Back to Projects</a>
                         <a href="/project/{{ project.id }}/workflow" class="btn" style="background: #6f42c1;">🔄 Workflow</a>
                         <a href="/project/{{ project.id }}/analysis-history" class="btn" style="background: #17a2b8;">📊 Analysis History</a>
+                        <a href="/project/{{ project.id }}/checklist-validation" class="btn" style="background: #28a745;">✅ Checklist Validation</a>
                         <a href="/upload?project_id={{ project.id }}" class="btn btn-success">📄 Upload Documents</a>
                     </div>
                 </div>
@@ -81,6 +85,10 @@
                             <div>
                                 <span class="status-badge status-completed">✅ Ready</span>
                                 <a href="/document/{{ doc.id }}" class="btn" style="margin-left: 10px;">View Analysis</a>
+                                <button onclick="deleteDocument({{ doc.id }}, '{{ doc.original_filename or doc.filename }}')" 
+                                        class="btn" style="background: #dc3545; margin-left: 5px;">
+                                    🗑️ Delete
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
@@ -110,5 +118,35 @@
                 </div>
                 {% endif %}
             </div>
+
+            <script>
+                async function deleteDocument(documentId, filename) {
+                    if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone and will remove:\n• The document file\n• All analysis data\n• Vector database entries`)) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/api/documents/${documentId}/delete`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            // Show success message
+                            alert(result.message);
+                            // Reload the page to update the document list
+                            window.location.reload();
+                        } else {
+                            alert('Error deleting document: ' + result.error);
+                        }
+                    } catch (error) {
+                        alert('Network error: ' + error.message);
+                    }
+                }
+            </script>
         </body>
         </html>

@@ -1258,6 +1258,321 @@ class GeneratedProposal(db.Model):
         self.download_count += 1
         self.last_downloaded_at = datetime.utcnow()
 
+# ========================================
+# RFP CHECKLIST SYSTEM MODELS
+# ========================================
+
+class RFPChecklistTemplate(db.Model):
+    """Store checklist templates per RFP type with Excel integration"""
+    __tablename__ = 'rfp_checklist_templates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    checklist_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    
+    # Template identification
+    rfp_type = db.Column(db.String(100), nullable=False)  # 'upgrade', 'implementation', etc.
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    version = db.Column(db.String(50), default='1.0')
+    
+    # Excel file details
+    original_filename = db.Column(db.String(500))
+    file_path = db.Column(db.String(1000))
+    file_size = db.Column(db.Integer)
+    file_hash = db.Column(db.String(64))
+    
+    # Checklist structure and configuration
+    sheets_config = db.Column(db.JSON)  # Which sheets to use, column mappings
+    checklist_structure = db.Column(db.JSON)  # Categories, sections, priorities
+    total_questions = db.Column(db.Integer, default=0)
+    
+    # Status and metadata
+    is_active = db.Column(db.Boolean, default=True)
+    is_default = db.Column(db.Boolean, default=False)  # Default template for this RFP type
+    parsing_status = db.Column(db.String(50), default='pending')  # 'pending', 'completed', 'failed'
+    parsing_errors = db.Column(db.JSON)
+    
+    # Audit fields
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    creator = db.relationship('User', foreign_keys=[created_by])
+    updater = db.relationship('User', foreign_keys=[updated_by])
+    checklist_items = db.relationship('ChecklistItem', backref='template', lazy=True, cascade='all, delete-orphan')
+    validations = db.relationship('RFPChecklistValidation', backref='template', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'checklist_id': self.checklist_id,
+            'rfp_type': self.rfp_type,
+            'name': self.name,
+            'description': self.description,
+            'version': self.version,
+            'total_questions': self.total_questions,
+            'is_active': self.is_active,
+            'is_default': self.is_default,
+            'parsing_status': self.parsing_status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class ChecklistItem(db.Model):
+    """Individual checklist items/questions from Excel templates"""
+    __tablename__ = 'checklist_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    
+    # Association
+    checklist_id = db.Column(db.String(100), db.ForeignKey('rfp_checklist_templates.checklist_id'), nullable=False)
+    
+    # Excel source information
+    sheet_name = db.Column(db.String(255))
+    row_number = db.Column(db.Integer)
+    excel_reference = db.Column(db.String(50))  # e.g., "Sheet1!B15"
+    
+    # Question details
+    section = db.Column(db.String(255))  # Main category
+    category = db.Column(db.String(255))  # Sub-category
+    question_text = db.Column(db.Text, nullable=False)
+    requirement_type = db.Column(db.String(100))  # 'technical', 'functional', 'infrastructure'
+    
+    # Validation criteria
+    priority = db.Column(db.String(50))  # 'high', 'medium', 'low', 'critical'
+    mandatory = db.Column(db.Boolean, default=False)
+    expected_response_type = db.Column(db.String(100))  # 'text', 'yes_no', 'numeric', 'date'
+    validation_criteria = db.Column(db.Text)  # What to look for in RFP
+    keywords = db.Column(db.JSON)  # Keywords to search for in RFP
+    
+    # AI processing hints
+    ai_analysis_prompt = db.Column(db.Text)  # Custom prompt for this question
+    context_requirements = db.Column(db.JSON)  # What context is needed for analysis
+    
+    # Ordering and display
+    display_order = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    validations = db.relationship('ChecklistItemValidation', backref='checklist_item', lazy=True)
+    clarifications = db.relationship('ClarificationRequest', backref='checklist_item', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_id': self.item_id,
+            'sheet_name': self.sheet_name,
+            'row_number': self.row_number,
+            'section': self.section,
+            'category': self.category,
+            'question_text': self.question_text,
+            'requirement_type': self.requirement_type,
+            'priority': self.priority,
+            'mandatory': self.mandatory,
+            'expected_response_type': self.expected_response_type,
+            'display_order': self.display_order,
+            'is_active': self.is_active
+        }
+
+class RFPChecklistValidation(db.Model):
+    """Overall validation results for an RFP against a checklist template"""
+    __tablename__ = 'rfp_checklist_validations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    validation_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    
+    # Associations
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    checklist_id = db.Column(db.String(100), db.ForeignKey('rfp_checklist_templates.checklist_id'), nullable=False)
+    
+    # Overall validation metrics
+    total_items = db.Column(db.Integer, default=0)
+    addressed_items = db.Column(db.Integer, default=0)
+    missing_items = db.Column(db.Integer, default=0)
+    partial_items = db.Column(db.Integer, default=0)
+    unclear_items = db.Column(db.Integer, default=0)
+    
+    # Completion statistics
+    overall_completion_percentage = db.Column(db.Float, default=0.0)
+    high_priority_completion = db.Column(db.Float, default=0.0)
+    mandatory_completion = db.Column(db.Float, default=0.0)
+    
+    # Processing details
+    ai_model_used = db.Column(db.String(100))
+    processing_time_seconds = db.Column(db.Float)
+    total_tokens_used = db.Column(db.Integer)
+    
+    # Status and results
+    status = db.Column(db.String(50), default='pending')  # 'pending', 'processing', 'completed', 'failed'
+    error_message = db.Column(db.Text)
+    validation_summary = db.Column(db.JSON)  # Summary by category/section
+    
+    # Exports and outputs
+    excel_export_path = db.Column(db.String(1000))  # Path to filled Excel checklist
+    clarification_export_path = db.Column(db.String(1000))  # Path to clarification sheet
+    
+    # Audit fields
+    validated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    validation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    project = db.relationship('Project', foreign_keys=[project_id])
+    validator = db.relationship('User', foreign_keys=[validated_by])
+    item_validations = db.relationship('ChecklistItemValidation', backref='validation', lazy=True, cascade='all, delete-orphan')
+    clarification_requests = db.relationship('ClarificationRequest', backref='validation', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'validation_id': self.validation_id,
+            'project_id': self.project_id,
+            'total_items': self.total_items,
+            'addressed_items': self.addressed_items,
+            'missing_items': self.missing_items,
+            'partial_items': self.partial_items,
+            'overall_completion_percentage': self.overall_completion_percentage,
+            'high_priority_completion': self.high_priority_completion,
+            'mandatory_completion': self.mandatory_completion,
+            'status': self.status,
+            'validation_date': self.validation_date.isoformat() if self.validation_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class ChecklistItemValidation(db.Model):
+    """Individual item validation results with AI analysis"""
+    __tablename__ = 'checklist_item_validations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_validation_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    
+    # Associations
+    validation_id = db.Column(db.String(100), db.ForeignKey('rfp_checklist_validations.validation_id'), nullable=False)
+    item_id = db.Column(db.String(100), db.ForeignKey('checklist_items.item_id'), nullable=False)
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    
+    # Validation results
+    status = db.Column(db.String(50), nullable=False)  # 'ADDRESSED', 'MISSING', 'PARTIAL', 'UNCLEAR'
+    confidence_score = db.Column(db.Float, default=0.0)  # 0.0 to 1.0
+    
+    # AI analysis results
+    extracted_content = db.Column(db.Text)  # Relevant text found in RFP
+    ai_analysis = db.Column(db.JSON)  # Full AI analysis response
+    ai_reasoning = db.Column(db.Text)  # Why this status was assigned
+    
+    # Source information
+    source_documents = db.Column(db.JSON)  # Which documents contained relevant info
+    source_sections = db.Column(db.JSON)  # Which sections/pages
+    relevant_excerpts = db.Column(db.JSON)  # Array of relevant text excerpts
+    
+    # Gap analysis
+    needs_clarification = db.Column(db.Boolean, default=False)
+    clarification_reason = db.Column(db.Text)
+    suggested_question = db.Column(db.Text)  # Suggested clarification question
+    
+    # Processing details
+    processing_time_seconds = db.Column(db.Float)
+    tokens_used = db.Column(db.Integer)
+    
+    # Timestamps
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    project = db.relationship('Project', foreign_keys=[project_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_validation_id': self.item_validation_id,
+            'status': self.status,
+            'confidence_score': self.confidence_score,
+            'extracted_content': self.extracted_content,
+            'ai_reasoning': self.ai_reasoning,
+            'needs_clarification': self.needs_clarification,
+            'clarification_reason': self.clarification_reason,
+            'suggested_question': self.suggested_question,
+            'analyzed_at': self.analyzed_at.isoformat() if self.analyzed_at else None
+        }
+
+class ClarificationRequest(db.Model):
+    """Track clarification requests that need to be sent to RFP issuers"""
+    __tablename__ = 'clarification_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.String(100), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    
+    # Associations
+    project_id = db.Column(db.String(255), db.ForeignKey('projects.id'), nullable=False)
+    validation_id = db.Column(db.String(100), db.ForeignKey('rfp_checklist_validations.validation_id'), nullable=False)
+    item_id = db.Column(db.String(100), db.ForeignKey('checklist_items.item_id'), nullable=False)
+    
+    # Clarification details
+    question_text = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(255))  # Same as checklist item category
+    section = db.Column(db.String(255))   # Same as checklist item section
+    priority = db.Column(db.String(50))   # 'critical', 'high', 'medium', 'low'
+    
+    # Context and reasoning
+    reason = db.Column(db.Text)  # Why this clarification is needed
+    relevant_rfp_sections = db.Column(db.JSON)  # RFP sections that were unclear
+    impact_if_not_clarified = db.Column(db.Text)  # Business impact
+    
+    # Status tracking
+    status = db.Column(db.String(50), default='PENDING')  # 'PENDING', 'SENT', 'RECEIVED', 'RESOLVED', 'WITHDRAWN'
+    internal_notes = db.Column(db.Text)  # Internal team notes
+    
+    # Communication tracking
+    sent_date = db.Column(db.DateTime)
+    response_received_date = db.Column(db.DateTime)
+    response_content = db.Column(db.Text)  # Client's response
+    
+    # Resolution
+    resolution_status = db.Column(db.String(50))  # 'SATISFIED', 'PARTIAL', 'NOT_ADDRESSED'
+    resolution_notes = db.Column(db.Text)
+    follow_up_required = db.Column(db.Boolean, default=False)
+    
+    # Export tracking
+    included_in_export = db.Column(db.Boolean, default=False)
+    export_reference = db.Column(db.String(100))  # Reference in clarification sheet
+    
+    # Audit fields
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    project = db.relationship('Project', foreign_keys=[project_id])
+    creator = db.relationship('User', foreign_keys=[created_by])
+    updater = db.relationship('User', foreign_keys=[updated_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'request_id': self.request_id,
+            'question_text': self.question_text,
+            'category': self.category,
+            'section': self.section,
+            'priority': self.priority,
+            'reason': self.reason,
+            'status': self.status,
+            'sent_date': self.sent_date.isoformat() if self.sent_date else None,
+            'response_received_date': self.response_received_date.isoformat() if self.response_received_date else None,
+            'resolution_status': self.resolution_status,
+            'follow_up_required': self.follow_up_required,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 def test_db_connection(app):
     """Test database connection"""
     try:

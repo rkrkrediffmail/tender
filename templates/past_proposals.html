@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Past Proposals - Vector Database</title>
+    <title>Past Proposals - AI Analysis</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -178,12 +179,12 @@
         <div class="header">
             <div>
                 <h1>🗂️ Past Proposals Management</h1>
-                <p>Upload and manage past tender proposals for AI-powered insights</p>
+                <p>Upload and manage past tender proposals for Claude AI-powered insights</p>
             </div>
             <div>
                 <a href="/" class="btn btn-primary">← Dashboard</a>
                 <a href="/projects" class="btn btn-info">Projects</a>
-                <button class="btn btn-warning" onclick="testVectorStore()">🧪 Test Vector Store</button>
+                <button class="btn btn-warning" onclick="testClaudeAnalysis()">🧪 Test Claude Analysis</button>
             </div>
         </div>
 
@@ -198,6 +199,10 @@
                 <div class="stat-label">Processed</div>
             </div>
             <div class="stat-card">
+                <div class="stat-number">{{ stats.claude_analyzed or 0 }}</div>
+                <div class="stat-label">Claude Analyzed</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-number">{{ stats.vector_stored or 0 }}</div>
                 <div class="stat-label">Vector Stored</div>
             </div>
@@ -210,7 +215,7 @@
         <!-- Upload Section -->
         <div class="upload-section">
             <h3>📤 Upload Past Proposal</h3>
-            <p>Upload your organization's past tender proposals and RFP responses to build the AI knowledge base.</p>
+            <p>Upload your organization's past tender proposals and RFP responses for Claude AI analysis and capability extraction.</p>
             
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="upload-form">
@@ -399,8 +404,14 @@
                         </td>
                         <td>{{ proposal.industry_sector|title if proposal.industry_sector else 'N/A' }}</td>
                         <td>
-                            {% if proposal.vector_stored %}
-                            ✅ Stored
+                            {% if proposal.claude_analyzed and proposal.vector_stored %}
+                            ✅ Full Intelligence
+                            {% elif proposal.claude_analyzed %}
+                            🧠 Claude Only
+                            {% elif proposal.vector_stored %}
+                            🗂️ Vector Only
+                            {% elif proposal.processing_status == 'processed' %}
+                            ⚠️ Text Extracted
                             {% else %}
                             ❌ Failed
                             {% endif %}
@@ -417,7 +428,7 @@
             {% else %}
             <div style="text-align: center; padding: 40px; color: #666;">
                 <h4>📄 No Past Proposals Yet</h4>
-                <p>Upload your organization's past proposals to start building the AI knowledge base.</p>
+                <p>Upload your organization's past proposals to start building the Claude AI capability database.</p>
             </div>
             {% endif %}
         </div>
@@ -520,16 +531,16 @@
             }
         }
 
-        // Test vector store
-        async function testVectorStore() {
+        // Test Claude analysis
+        async function testClaudeAnalysis() {
             try {
-                const response = await fetch('/api/vector-store/test');
+                const response = await fetch('/api/claude-analysis/test');
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Vector store test passed! System is working correctly.');
+                    alert('✅ Claude analysis test passed! System is working correctly.');
                 } else {
-                    alert('❌ Vector store test failed. Check the logs for details.');
+                    alert('❌ Claude analysis test failed. Check the logs for details.');
                 }
             } catch (error) {
                 alert(`❌ Test failed: ${error.message}`);

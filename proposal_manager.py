@@ -10,7 +10,8 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from models import db
-from vector_store import get_vector_store
+from claude_proposal_analyzer import ClaudeProposalAnalyzer
+from claude_vector_intelligence import get_claude_vector_intelligence
 from document_processor import DocumentProcessor
 import uuid
 
@@ -58,8 +59,15 @@ class PastProposal(db.Model):
     
     # Processing Information
     processing_status = db.Column(db.String(50), default='pending')  # pending, processed, failed
+    claude_analyzed = db.Column(db.Boolean, default=False)
     vector_stored = db.Column(db.Boolean, default=False)
     error_message = db.Column(db.Text)
+    
+    # Claude Analysis Results
+    extracted_capabilities = db.Column(db.JSON, default=list)
+    extracted_technologies = db.Column(db.JSON, default=list)
+    company_experience = db.Column(db.JSON, default=list)
+    solution_approaches = db.Column(db.JSON, default=list)
     
     # Timestamps
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -86,6 +94,7 @@ class PastProposal(db.Model):
             'technologies_used': self.technologies_used,
             'industry_sector': self.industry_sector,
             'processing_status': self.processing_status,
+            'claude_analyzed': self.claude_analyzed,
             'vector_stored': self.vector_stored,
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None
@@ -95,7 +104,8 @@ class ProposalManager:
     """Service for managing past proposals"""
     
     def __init__(self):
-        self.vector_store = get_vector_store()
+        self.claude_analyzer = ClaudeProposalAnalyzer()
+        self.claude_vector_intelligence = get_claude_vector_intelligence()
         self.document_processor = None
         self._init_document_processor()
     
@@ -152,6 +162,31 @@ class ProposalManager:
             else:
                 extraction_error = "Document processor not available"
             
+            # Full Claude + Vector Intelligence Processing
+            intelligence_results = {}
+            if extracted_content:
+                try:
+                    # Use the advanced Claude Vector Intelligence system
+                    intelligence_results = self.claude_vector_intelligence.process_past_proposal(
+                        content=extracted_content, 
+                        metadata=metadata
+                    )
+                    print(f"Claude Vector Intelligence processing: {intelligence_results.get('chunks_stored', 0)} chunks stored")
+                except Exception as e:
+                    print(f"Claude Vector Intelligence failed: {e}")
+                    # Fallback to basic Claude analysis
+                    try:
+                        claude_analysis = self.claude_analyzer.analyze_proposal(extracted_content, metadata)
+                        intelligence_results = {
+                            'success': bool(claude_analysis),
+                            'claude_analysis': claude_analysis,
+                            'vector_storage_success': False,
+                            'chunks_stored': 0
+                        }
+                    except Exception as e2:
+                        print(f"Fallback Claude analysis also failed: {e2}")
+                        intelligence_results = {'success': False, 'error': str(e2)}
+            
             # Create database record
             proposal = PastProposal(
                 title=metadata.get('title', filename),
@@ -168,7 +203,7 @@ class ProposalManager:
                 currency=metadata.get('currency', 'USD'),
                 status=metadata.get('status', 'unknown'),
                 win_probability=metadata.get('win_probability'),
-                technologies_used=metadata.get('technologies_used', []),
+                technologies_used=claude_analysis.get('technologies', metadata.get('technologies_used', [])),
                 industry_sector=metadata.get('industry_sector'),
                 project_duration=metadata.get('project_duration'),
                 team_size=metadata.get('team_size'),
@@ -178,55 +213,36 @@ class ProposalManager:
                 key_challenges=metadata.get('key_challenges', []),
                 processing_status='processed' if extracted_content else 'failed',
                 error_message=extraction_error,
-                uploaded_by=user_id
+                uploaded_by=user_id,
+                claude_analyzed=intelligence_results.get('success', False),
+                extracted_capabilities=intelligence_results.get('claude_analysis', {}).get('core_capabilities_demonstrated', []),
+                extracted_technologies=intelligence_results.get('claude_analysis', {}).get('technologies_and_platforms', []),
+                company_experience=intelligence_results.get('claude_analysis', {}).get('industry_specific_expertise', []),
+                solution_approaches=intelligence_results.get('claude_analysis', {}).get('solution_architecture_patterns', [])
             )
             
             db.session.add(proposal)
             db.session.commit()
             
-            # Add to vector store with proposal-type specific collection
-            vector_success = False
-            if extracted_content and self.vector_store:
-                # Use separate collection based on proposal type
-                collection_name = f"past_proposal_{proposal.proposal_type}"
-                
-                vector_metadata = {
-                    "proposal_id": proposal.proposal_id,
-                    "title": proposal.title,
-                    "client_name": proposal.client_name,
-                    "project_type": proposal.project_type,
-                    "proposal_type": proposal.proposal_type,
-                    "submission_year": proposal.submission_year,
-                    "status": proposal.status,
-                    "technologies": proposal.technologies_used,
-                    "industry_sector": proposal.industry_sector,
-                    "proposal_value": proposal.proposal_value
-                }
-                
-                try:
-                    # Store in collection specific to proposal type
-                    vector_success = self.vector_store.add_proposal_document(
-                        content=extracted_content,
-                        metadata=vector_metadata,
-                        document_type=proposal.proposal_type,
-                        collection_name=collection_name
-                    )
-                except Exception as e:
-                    logger.warning(f"Vector storage failed: {e}")
-                    vector_success = False
-                
-                if vector_success:
-                    proposal.vector_stored = True
-                    proposal.processed_at = datetime.utcnow()
-                    db.session.commit()
+            # Store vector storage success info
+            proposal.vector_stored = intelligence_results.get('vector_storage_success', False)
+            
+            # Commit the proposal to database
+            if proposal.claude_analyzed:
+                proposal.processed_at = datetime.utcnow()
+            db.session.commit()
             
             result = {
                 'success': True,
                 'proposal_id': proposal.proposal_id,
                 'extracted_length': len(extracted_content) if extracted_content else 0,
-                'vector_stored': vector_success,
+                'claude_analyzed': proposal.claude_analyzed,
+                'vector_stored': intelligence_results.get('vector_storage_success', False),
                 'processing_status': proposal.processing_status,
-                'message': f'Proposal uploaded and processed successfully' if extracted_content else f'Proposal uploaded but processing failed: {extraction_error}'
+                'chunks_stored': intelligence_results.get('chunks_stored', 0),
+                'capabilities_found': len(intelligence_results.get('claude_analysis', {}).get('core_capabilities_demonstrated', [])),
+                'intelligence_score': intelligence_results.get('claude_analysis', {}).get('intelligence_score', 0.0),
+                'message': f'Proposal uploaded, analyzed, and {intelligence_results.get("chunks_stored", 0)} chunks stored in vector DB' if extracted_content else f'Proposal uploaded but processing failed: {extraction_error}'
             }
             
             logger.info(f"Uploaded proposal: {filename} - {result['message']}")
@@ -245,40 +261,36 @@ class ProposalManager:
                                   query: str, 
                                   limit: int = 10,
                                   filters: Optional[Dict] = None) -> List[Dict]:
-        """Get proposals similar to query"""
+        """Get proposals similar to query using Claude Vector Intelligence"""
         try:
-            if not self.vector_store:
-                return []
-            
-            # Search vector store
-            similar_docs = self.vector_store.search_similar_proposals(
+            # Use the advanced Claude Vector Intelligence system
+            results = self.claude_vector_intelligence.intelligent_similarity_search(
                 query=query,
-                k=limit,
-                filter_metadata=filters
+                filters=filters,
+                limit=limit
             )
             
-            # Get proposal IDs from results
-            proposal_ids = [doc['metadata'].get('proposal_id') for doc in similar_docs if doc['metadata'].get('proposal_id')]
+            # Convert vector results to proposal format
+            formatted_results = []
+            for result in results:
+                formatted_results.append({
+                    'title': result.get('metadata', {}).get('title', ''),
+                    'client_name': result.get('metadata', {}).get('client_name', ''),
+                    'project_type': result.get('metadata', {}).get('project_type', ''),
+                    'industry_sector': result.get('metadata', {}).get('industry_sector', ''),
+                    'submission_year': result.get('metadata', {}).get('submission_year'),
+                    'status': result.get('metadata', {}).get('status', ''),
+                    'similarity_score': result.get('similarity_score', 0),
+                    'intelligence_score': result.get('intelligence_score', 0),
+                    'matching_content': result.get('content', '')[:300] + '...' if len(result.get('content', '')) > 300 else result.get('content', ''),
+                    'relevance_explanation': result.get('relevance_explanation', ''),
+                    'recommended_usage': result.get('recommended_usage', ''),
+                    'key_insights': result.get('key_insights', []),
+                    'chunk_type': result.get('metadata', {}).get('chunk_type', ''),
+                    'proposal_id': result.get('metadata', {}).get('proposal_id', '')
+                })
             
-            # Get full proposal data from database
-            proposals = PastProposal.query.filter(PastProposal.proposal_id.in_(proposal_ids)).all()
-            proposal_dict = {p.proposal_id: p for p in proposals}
-            
-            # Combine vector results with database data
-            results = []
-            for doc in similar_docs:
-                proposal_id = doc['metadata'].get('proposal_id')
-                if proposal_id and proposal_id in proposal_dict:
-                    proposal = proposal_dict[proposal_id]
-                    result = proposal.to_dict()
-                    result.update({
-                        'similarity_score': doc['similarity_score'],
-                        'matching_content': doc['content'][:300] + '...' if len(doc['content']) > 300 else doc['content'],
-                        'relevance': doc['relevance']
-                    })
-                    results.append(result)
-            
-            return results
+            return formatted_results
             
         except Exception as e:
             logger.error(f"Error getting similar proposals: {e}")
@@ -288,51 +300,30 @@ class ProposalManager:
                                    requirements: List[str],
                                    project_metadata: Dict = None) -> Dict[str, Any]:
         """
-        Get relevant context from past proposals for a new proposal
+        Get intelligent context from past proposals using Claude Vector Intelligence
         
         Args:
             requirements: Requirements from new RFP
             project_metadata: Current project information
         
         Returns:
-            Context dictionary with relevant past proposals and insights
+            Context dictionary with intelligent past proposal insights
         """
         try:
-            if not self.vector_store:
-                return {"error": "Vector store not available"}
-            
-            # Get context from vector store
-            context = self.vector_store.get_context_for_analysis(
+            # Use the advanced Claude Vector Intelligence system
+            context = self.claude_vector_intelligence.get_intelligent_context_for_agents(
                 requirements=requirements,
-                project_metadata=project_metadata
+                project_metadata=project_metadata or {}
             )
             
-            # Enhance with database information
-            if context.get('relevant_proposals'):
-                proposal_ids = [p['metadata'].get('proposal_id') for p in context['relevant_proposals']]
-                proposals = PastProposal.query.filter(
-                    PastProposal.proposal_id.in_(proposal_ids)
-                ).all()
-                
-                # Add success metrics
-                won_proposals = [p for p in proposals if p.status == 'won']
-                if won_proposals:
-                    avg_win_value = sum(p.actual_value or p.proposal_value or 0 for p in won_proposals) / len(won_proposals)
-                    context['success_metrics'] = {
-                        'similar_won_proposals': len(won_proposals),
-                        'average_win_value': avg_win_value,
-                        'win_rate': len(won_proposals) / len(proposals) if proposals else 0,
-                        'key_success_factors': [factor for p in won_proposals for factor in (p.key_success_factors or [])]
-                    }
-            
-            # Add industry insights
+            # Add database statistics for additional context
             if project_metadata and project_metadata.get('industry_sector'):
                 industry_proposals = PastProposal.query.filter(
                     PastProposal.industry_sector == project_metadata['industry_sector'],
                     PastProposal.status == 'won'
                 ).limit(5).all()
                 
-                context['industry_insights'] = {
+                context['database_insights'] = {
                     'similar_industry_wins': len(industry_proposals),
                     'common_technologies': self._extract_common_technologies(industry_proposals),
                     'typical_duration': self._get_typical_duration(industry_proposals),
@@ -393,6 +384,10 @@ class ProposalManager:
             processed_proposals = PastProposal.query.filter(
                 PastProposal.processing_status == 'processed'
             ).count()
+            claude_analyzed = PastProposal.query.filter(
+                PastProposal.claude_analyzed == True
+            ).count()
+            
             vector_stored = PastProposal.query.filter(
                 PastProposal.vector_stored == True
             ).count()
@@ -401,19 +396,23 @@ class ProposalManager:
                 PastProposal.status == 'won'
             ).count()
             
-            # Get vector store stats
-            vector_stats = {}
-            if self.vector_store:
-                vector_stats = self.vector_store.get_collection_stats()
+            # Get capabilities stats
+            capabilities_extracted = PastProposal.query.filter(
+                PastProposal.extracted_capabilities != None,
+                PastProposal.extracted_capabilities != []
+            ).count()
             
             return {
                 'total_proposals': total_proposals,
                 'processed_proposals': processed_proposals,
+                'claude_analyzed': claude_analyzed,
                 'vector_stored': vector_stored,
+                'capabilities_extracted': capabilities_extracted,
                 'won_proposals': won_proposals,
                 'win_rate': won_proposals / total_proposals if total_proposals > 0 else 0,
-                'vector_store_stats': vector_stats,
-                'processing_success_rate': processed_proposals / total_proposals if total_proposals > 0 else 0
+                'processing_success_rate': processed_proposals / total_proposals if total_proposals > 0 else 0,
+                'analysis_success_rate': claude_analyzed / total_proposals if total_proposals > 0 else 0,
+                'vector_storage_rate': vector_stored / total_proposals if total_proposals > 0 else 0
             }
             
         except Exception as e:
@@ -422,265 +421,53 @@ class ProposalManager:
     
     def get_relevant_past_proposals(self, analysis_results: Dict[str, Any], proposal_type: str = "technical", limit: int = 10) -> Dict[str, Any]:
         """
-        Automatically retrieve relevant past proposals based on current RFP analysis
-        This is the main intelligence function that replaces manual search
+        Automatically retrieve relevant past proposals using Claude Vector Intelligence
+        This is the main intelligence function for agent-driven proposal generation
         """
         try:
-            logger.info(f"Getting relevant past proposals for {proposal_type} proposal")
+            logger.info(f"Getting relevant past proposals for {proposal_type} proposal using Claude Vector Intelligence")
             
-            # Extract search context from analysis results
-            search_context = self._extract_search_context(analysis_results)
+            # Extract requirements from analysis results for intelligent search
+            requirements = []
+            if isinstance(analysis_results, dict):
+                requirements.extend(analysis_results.get('must_have_requirements', []))
+                requirements.extend(analysis_results.get('technical_specifications', []))
+                requirements.extend(analysis_results.get('good_to_have_requirements', []))
             
-            # Get collection name for specific proposal type
-            collection_name = f"past_proposal_{proposal_type}"
-            
-            # Retrieve relevant proposals using semantic search
-            relevant_proposals = []
-            
-            if self.vector_store:
-                # Search by requirements
-                for requirement in search_context.get('key_requirements', [])[:5]:
-                    try:
-                        results = self.vector_store.similarity_search(
-                            query=requirement,
-                            k=3,
-                            collection_name=collection_name,
-                            filter_criteria={
-                                'proposal_type': proposal_type,
-                                'status': 'won'  # Prioritize successful proposals
-                            }
-                        )
-                        relevant_proposals.extend(results)
-                    except Exception as e:
-                        logger.warning(f"Search failed for requirement: {e}")
-                
-                # Search by industry/project type
-                if search_context.get('industry') or search_context.get('project_type'):
-                    industry_query = f"{search_context.get('industry', '')} {search_context.get('project_type', '')} project"
-                    try:
-                        industry_results = self.vector_store.similarity_search(
-                            query=industry_query.strip(),
-                            k=5,
-                            collection_name=collection_name,
-                            filter_criteria={
-                                'industry_sector': search_context.get('industry'),
-                                'project_type': search_context.get('project_type')
-                            }
-                        )
-                        relevant_proposals.extend(industry_results)
-                    except Exception as e:
-                        logger.warning(f"Industry search failed: {e}")
-            
-            # Remove duplicates and rank by relevance
-            unique_proposals = self._deduplicate_and_rank(relevant_proposals, search_context)
-            
-            # Extract reusable content sections
-            reusable_content = self._extract_reusable_content(unique_proposals[:limit], search_context)
-            
-            return {
-                'success': True,
-                'found_proposals': len(unique_proposals),
-                'relevant_proposals': unique_proposals[:limit],
-                'reusable_content': reusable_content,
-                'search_context': search_context,
-                'recommendations': self._generate_usage_recommendations(reusable_content),
-                'confidence_score': self._calculate_confidence(unique_proposals, search_context)
+            # Project metadata for context
+            project_metadata = {
+                'project_type': analysis_results.get('project_type', proposal_type),
+                'industry_sector': analysis_results.get('industry_sector', 'bfsi')
             }
+            
+            # Use Claude Vector Intelligence to get comprehensive context
+            intelligence_context = self.claude_vector_intelligence.get_intelligent_context_for_agents(
+                requirements=requirements[:10],  # Limit for performance
+                project_metadata=project_metadata
+            )
+            
+            # Transform into expected format for proposal generation
+            if intelligence_context.get('success'):
+                return {
+                    'success': True,
+                    'found_proposals': intelligence_context.get('sources_analyzed', 0),
+                    'reusable_content': intelligence_context.get('reusable_content_sections', {}),
+                    'capability_intelligence': intelligence_context.get('capability_intelligence', {}),
+                    'generation_guidance': intelligence_context.get('generation_guidance', {}),
+                    'confidence_score': intelligence_context.get('executive_intelligence', {}).get('confidence_level', 0.5),
+                    'agent_instructions': intelligence_context.get('usage_instructions_for_agents', {}),
+                    'gap_analysis': intelligence_context.get('gap_analysis', {}),
+                    'intelligence_timestamp': intelligence_context.get('synthesis_timestamp')
+                }
+            else:
+                return {'success': False, 'error': intelligence_context.get('error', 'Unknown error')}
             
         except Exception as e:
             logger.error(f"Error getting relevant past proposals: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _extract_search_context(self, analysis_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract search context from current RFP analysis"""
-        context = {
-            'key_requirements': [],
-            'technologies': [],
-            'industry': None,
-            'project_type': None,
-            'search_terms': []
-        }
-        
-        try:
-            # Extract from different analysis components
-            if isinstance(analysis_results, dict):
-                # From requirements
-                if analysis_results.get('must_have_requirements'):
-                    context['key_requirements'] = analysis_results['must_have_requirements'][:10]
-                
-                # From technical specs
-                if analysis_results.get('technical_specifications'):
-                    for spec in analysis_results['technical_specifications'][:5]:
-                        context['search_terms'].extend(self._extract_keywords(spec))
-                
-                # From project context
-                context['industry'] = analysis_results.get('industry_sector', '')
-                context['project_type'] = analysis_results.get('project_type', '')
-                context['technologies'] = analysis_results.get('technologies', [])
-        
-        except Exception as e:
-            logger.error(f"Error extracting search context: {e}")
-        
-        return context
-    
-    def _extract_keywords(self, text: str) -> List[str]:
-        """Extract relevant keywords from text"""
-        if not text or not isinstance(text, str):
-            return []
-        
-        keywords = []
-        
-        # Common technical terms to look for
-        tech_terms = [
-            'API', 'REST', 'database', 'cloud', 'AWS', 'Azure', 'security', 'integration',
-            'architecture', 'framework', 'platform', 'system', 'solution', 'infrastructure',
-            'microservices', 'docker', 'kubernetes', 'python', 'java', 'react', 'angular',
-            'machine learning', 'AI', 'blockchain', 'IoT', 'mobile', 'web', 'dashboard'
-        ]
-        
-        text_lower = text.lower()
-        for term in tech_terms:
-            if term.lower() in text_lower:
-                keywords.append(term)
-        
-        # Extract capitalized words (likely important terms)
-        words = text.split()
-        for word in words:
-            if word.isalpha() and len(word) > 3 and word[0].isupper():
-                keywords.append(word)
-        
-        return list(set(keywords))[:10]  # Return top 10 unique keywords
-    
-    def _deduplicate_and_rank(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Remove duplicates and rank by relevance"""
-        # Deduplicate by proposal_id
-        seen_ids = set()
-        unique_proposals = []
-        
-        for proposal in proposals:
-            proposal_id = proposal.get('metadata', {}).get('proposal_id') or proposal.get('proposal_id')
-            if proposal_id and proposal_id not in seen_ids:
-                unique_proposals.append(proposal)
-                seen_ids.add(proposal_id)
-        
-        # Rank by relevance
-        for proposal in unique_proposals:
-            score = proposal.get('similarity_score', 0.5)
-            metadata = proposal.get('metadata', {})
-            
-            # Boost successful proposals
-            if metadata.get('status') == 'won':
-                score += 0.3
-            
-            # Boost industry match
-            if metadata.get('industry_sector') == context.get('industry'):
-                score += 0.2
-            
-            # Boost project type match  
-            if metadata.get('project_type') == context.get('project_type'):
-                score += 0.15
-            
-            # Boost recent proposals
-            if metadata.get('submission_year', 0) >= 2020:
-                score += 0.1
-            
-            proposal['relevance_score'] = min(1.0, score)
-        
-        return sorted(unique_proposals, key=lambda x: x.get('relevance_score', 0), reverse=True)
-    
-    def _extract_reusable_content(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract reusable content sections from past proposals"""
-        sections = {
-            'technical_approach': [],
-            'solution_architecture': [],
-            'implementation_methodology': [],
-            'quality_assurance': [],
-            'team_expertise': [],
-            'similar_experience': [],
-            'risk_mitigation': []
-        }
-        
-        for proposal in proposals:
-            content = proposal.get('page_content', '') or proposal.get('content', '')
-            if not content:
-                continue
-            
-            # Simple section identification based on keywords
-            content_lower = content.lower()
-            
-            # Technical approach
-            if any(keyword in content_lower for keyword in ['technical approach', 'solution design', 'methodology']):
-                sections['technical_approach'].append({
-                    'content': content[:800],  # Limit content length
-                    'source': proposal.get('metadata', {}),
-                    'confidence': proposal.get('relevance_score', 0.5)
-                })
-            
-            # Implementation methodology
-            if any(keyword in content_lower for keyword in ['implementation', 'delivery', 'project phases']):
-                sections['implementation_methodology'].append({
-                    'content': content[:800],
-                    'source': proposal.get('metadata', {}),
-                    'confidence': proposal.get('relevance_score', 0.5)
-                })
-            
-            # Team expertise
-            if any(keyword in content_lower for keyword in ['team', 'expertise', 'experience', 'qualifications']):
-                sections['team_expertise'].append({
-                    'content': content[:800],
-                    'source': proposal.get('metadata', {}),
-                    'confidence': proposal.get('relevance_score', 0.5)
-                })
-        
-        # Limit and sort sections by confidence
-        for section_name in sections:
-            sections[section_name] = sorted(
-                sections[section_name], 
-                key=lambda x: x.get('confidence', 0), 
-                reverse=True
-            )[:3]  # Top 3 per section
-        
-        return sections
-    
-    def _generate_usage_recommendations(self, reusable_content: Dict[str, Any]) -> List[Dict[str, str]]:
-        """Generate recommendations for using past proposal content"""
-        recommendations = []
-        
-        for section_name, content_list in reusable_content.items():
-            if content_list:
-                recommendations.append({
-                    'section': section_name.replace('_', ' ').title(),
-                    'recommendation': f"Found {len(content_list)} relevant examples for {section_name.replace('_', ' ')}",
-                    'action': 'Integrate key concepts and adapt language to current RFP',
-                    'confidence': 'high' if len(content_list) >= 2 else 'medium'
-                })
-        
-        if len([r for r in recommendations if r['confidence'] == 'high']) >= 3:
-            recommendations.insert(0, {
-                'section': 'Overall',
-                'recommendation': 'Strong past proposal foundation available',
-                'action': 'Leverage extensively with proper adaptation',
-                'confidence': 'high'
-            })
-        
-        return recommendations
-    
-    def _calculate_confidence(self, proposals: List[Dict[str, Any]], context: Dict[str, Any]) -> float:
-        """Calculate confidence score for past proposal recommendations"""
-        if not proposals:
-            return 0.0
-        
-        base_score = min(0.8, len(proposals) * 0.08)  # Base from quantity
-        
-        # Boost for high relevance scores
-        avg_relevance = sum(p.get('relevance_score', 0) for p in proposals) / len(proposals)
-        base_score += avg_relevance * 0.3
-        
-        # Boost for won proposals
-        won_count = len([p for p in proposals if p.get('metadata', {}).get('status') == 'won'])
-        base_score += (won_count / len(proposals)) * 0.2
-        
-        return min(1.0, base_score)
+    # Helper methods that are no longer needed with Claude analyzer
+    # Kept for backward compatibility if any routes still call them
 
 # Singleton instance
 proposal_manager_instance = None

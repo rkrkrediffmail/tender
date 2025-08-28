@@ -38,6 +38,17 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def api_login_required(f):
+    """API login requirement decorator that returns JSON error instead of redirect"""
+    from functools import wraps
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return jsonify({'success': False, 'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -76,7 +87,9 @@ def create_app():
 
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:password@db:5432/tender_system')
+    # Use SQLite for local development if no DATABASE_URL is provided
+    default_db = 'sqlite:///tender_system.db' if not os.getenv('DATABASE_URL') else 'postgresql://postgres:password@db:5432/tender_system'
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', 'uploads')
     app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))  # 50MB
@@ -87,10 +100,44 @@ def create_app():
     # Initialize database
     db.init_app(app)
 
+    # Initialize Azure Storage System
+    try:
+        from azure_blob_storage_manager import init_blob_storage
+        from azure_vector_db_manager import init_azure_vector_db
+        from azure_file_manager import init_azure_file_system
+        
+        # Initialize Azure systems
+        blob_result = init_blob_storage()
+        vector_result = init_azure_vector_db()
+        file_result = init_azure_file_system()
+        
+        if blob_result['success'] and vector_result['success'] and file_result['success']:
+            app.config['AZURE_STORAGE_ENABLED'] = True
+            print("✅ Azure Storage System initialized successfully")
+        else:
+            app.config['AZURE_STORAGE_ENABLED'] = False
+            print("⚠️ Azure Storage System initialization failed - falling back to local storage")
+            print(f"   Blob Storage: {blob_result.get('error', 'OK')}")
+            print(f"   Vector DB: {vector_result.get('error', 'OK')}")
+            print(f"   File System: {file_result.get('error', 'OK')}")
+    except ImportError:
+        app.config['AZURE_STORAGE_ENABLED'] = False
+        print("⚠️ Azure dependencies not installed - using local storage")
+    except Exception as e:
+        app.config['AZURE_STORAGE_ENABLED'] = False
+        print(f"⚠️ Azure Storage initialization failed: {e}")
+
     # Initialize document processor
     anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
     if anthropic_api_key:
-        document_processor = DocumentProcessor(anthropic_api_key, app.config['UPLOAD_FOLDER'])
+        if app.config.get('AZURE_STORAGE_ENABLED'):
+            # Use temporary directory for document processing with Azure storage
+            from azure_blob_storage_manager import get_blob_storage_manager
+            temp_upload_folder = get_blob_storage_manager().temp_dir
+        else:
+            temp_upload_folder = app.config['UPLOAD_FOLDER']
+        
+        document_processor = DocumentProcessor(anthropic_api_key, temp_upload_folder)
         app.config['DOCUMENT_PROCESSOR'] = document_processor
     else:
         print("⚠️ ANTHROPIC_API_KEY not configured")
@@ -525,7 +572,7 @@ def create_app():
             return redirect('/projects')
 
     @app.route('/api/post_upload_analysis/<project_id>')
-    @login_required
+    @api_login_required
     def get_post_upload_analysis(project_id):
         """Get stored post-upload analysis results or indicate if fresh analysis is needed"""
         try:
@@ -682,7 +729,7 @@ def create_app():
             return jsonify({'success': False, 'error': str(e)})
 
     @app.route('/api/post_upload_analysis/<project_id>/run-fresh', methods=['POST'])
-    @login_required
+    @api_login_required
     def run_fresh_post_upload_analysis(project_id):
         """Run fresh comprehensive post-upload analysis for go/no-go decision"""
         import time
@@ -1624,7 +1671,7 @@ def create_app():
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/upload', methods=['POST'])
-    @login_required
+    @api_login_required
     def upload_file():
         """Handle file upload API - Enhanced with better error handling"""
         try:
@@ -1682,26 +1729,50 @@ def create_app():
                 print(f"❌ File too large: {file_size} > {app.config['MAX_CONTENT_LENGTH']}")
                 return jsonify({'success': False, 'error': f'File too large. Maximum size: {max_mb:.1f} MB'}), 400
 
-            # Save file
-            original_filename = secure_filename(file.filename)
-            unique_filename = f"{uuid.uuid4()}_{original_filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            # Save file using Azure File Manager (or local fallback)
+            if app.config.get('AZURE_STORAGE_ENABLED'):
+                from azure_file_manager import get_azure_file_manager
+                azure_file_manager = get_azure_file_manager()
+                
+                save_result = azure_file_manager.save_uploaded_file(
+                    file=file,
+                    container_type='uploads',
+                    add_timestamp=True,
+                    add_uuid=True
+                )
+                
+                if not save_result['success']:
+                    print(f"❌ Azure file save failed: {save_result['error']}")
+                    return jsonify({'success': False, 'error': f"File save failed: {save_result['error']}"}), 500
+                
+                # Use local temp path for immediate processing
+                file_path = save_result['local_temp_path']
+                unique_filename = save_result['saved_filename']
+                original_filename = save_result['original_filename']
+                saved_size = save_result['file_size']
+                
+                print(f"✅ File saved to Azure Blob Storage: {unique_filename} ({saved_size} bytes)")
+            else:
+                # Fallback to local storage
+                original_filename = secure_filename(file.filename)
+                unique_filename = f"{uuid.uuid4()}_{original_filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
 
-            print(f"💾 Saving file to: {file_path}")
+                print(f"💾 Saving file locally to: {file_path}")
 
-            # Ensure upload directory exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                # Ensure upload directory exists
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-            # Save the file
-            file.save(file_path)
+                # Save the file
+                file.save(file_path)
 
-            # Verify file was saved correctly
-            if not os.path.exists(file_path):
-                print(f"❌ File was not saved: {file_path}")
-                return jsonify({'success': False, 'error': 'File save failed'}), 500
+                # Verify file was saved correctly
+                if not os.path.exists(file_path):
+                    print(f"❌ File was not saved: {file_path}")
+                    return jsonify({'success': False, 'error': 'File save failed'}), 500
 
-            saved_size = os.path.getsize(file_path)
-            print(f"✅ File saved successfully: {saved_size} bytes")
+                saved_size = os.path.getsize(file_path)
+                print(f"✅ File saved locally: {saved_size} bytes")
 
             if saved_size != file_size:
                 print(f"⚠️ Size mismatch: uploaded={file_size}, saved={saved_size}")
@@ -1852,7 +1923,7 @@ def create_app():
             return jsonify({'error': f'Status check failed: {str(e)}'}), 500
 
     @app.route('/api/generate-proposal/<project_id>', methods=['POST'])
-    @login_required
+    @api_login_required
     def api_generate_proposal(project_id):
         """API endpoint to generate proposal documents with individual/batch modes"""
         try:
@@ -2247,19 +2318,36 @@ def create_app():
     @login_required
     def past_proposals_page():
         """Page for managing past proposals"""
+        print("DEBUG: Accessing past proposals page...")
         try:
+            print("DEBUG: Importing proposal_manager...")
             from proposal_manager import get_proposal_manager
             
+            print("DEBUG: Getting proposal manager instance...")
             proposal_manager = get_proposal_manager()
-            proposals = proposal_manager.get_all_proposals(limit=50)
-            stats = proposal_manager.get_proposal_statistics()
             
+            print("DEBUG: Getting all proposals...")
+            proposals = proposal_manager.get_all_proposals(limit=50)
+            print(f"DEBUG: Found {len(proposals)} proposals")
+            
+            print("DEBUG: Getting proposal statistics...")
+            stats = proposal_manager.get_proposal_statistics()
+            print(f"DEBUG: Stats: {stats}")
+            
+            print("DEBUG: Rendering template...")
             return render_template('past_proposals.html', 
                                  proposals=proposals,
                                  stats=stats)
         except Exception as e:
+            print(f"DEBUG: Error in past_proposals_page: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Still render the page with empty data instead of redirecting
             flash(f'Error loading past proposals: {e}', 'error')
-            return redirect('/')
+            return render_template('past_proposals.html', 
+                                 proposals=[],
+                                 stats={'total': 0, 'by_type': {}, 'by_status': {}})
 
     @app.route('/api/upload-past-proposal', methods=['POST'])
     @login_required
@@ -2300,12 +2388,33 @@ def create_app():
                 'key_challenges': request.form.get('key_challenges', '').split(',') if request.form.get('key_challenges') else []
             }
             
-            # Save file
-            filename = secure_filename(file.filename)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            unique_filename = f"past_{timestamp}_{filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(file_path)
+            # Save file using Azure File Manager (or local fallback)
+            if app.config.get('AZURE_STORAGE_ENABLED'):
+                from azure_file_manager import get_azure_file_manager
+                azure_file_manager = get_azure_file_manager()
+                
+                save_result = azure_file_manager.save_uploaded_file(
+                    file=file,
+                    container_type='uploads',
+                    custom_filename='past_proposal',
+                    add_timestamp=True,
+                    add_uuid=False
+                )
+                
+                if not save_result['success']:
+                    return jsonify({'error': f"File save failed: {save_result['error']}"}), 500
+                
+                # Use local temp path for proposal manager processing
+                file_path = save_result['local_temp_path']
+                filename = save_result['original_filename']
+                unique_filename = save_result['saved_filename']
+            else:
+                # Fallback to local storage
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                unique_filename = f"past_{timestamp}_{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(file_path)
             
             # Process with proposal manager
             proposal_manager = get_proposal_manager()
@@ -2383,6 +2492,39 @@ def create_app():
             
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/claude-analysis/test')
+    @login_required
+    def test_claude_analysis():
+        """Test Claude analysis functionality"""
+        try:
+            from claude_proposal_analyzer import ClaudeProposalAnalyzer
+            
+            analyzer = ClaudeProposalAnalyzer()
+            test_content = "This is a test proposal for a banking core system implementation using Temenos T24. The project involves API integrations, cloud deployment, and regulatory compliance features."
+            test_metadata = {
+                'title': 'Test Banking Proposal',
+                'client_name': 'Test Bank',
+                'project_type': 'banking',
+                'status': 'won'
+            }
+            
+            result = analyzer.analyze_proposal(test_content, test_metadata)
+            
+            return jsonify({
+                'success': bool(result and result.get('capabilities')),
+                'message': 'Claude analysis test completed',
+                'capabilities_found': len(result.get('capabilities', [])),
+                'technologies_found': len(result.get('technologies', [])),
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'message': 'Claude analysis test failed'
+            }), 500
 
     # Helper functions for partner recommendations
     def calculate_simple_fit_score(analysis_results, product):
@@ -2883,7 +3025,7 @@ def create_app():
     def get_admin_rfp_types():
         """Get all RFP types with statistics"""
         try:
-            from models import RFPTypeConfig, Project
+            from models import RFPTypeConfig, Project, RFPChecklistTemplate
             from sqlalchemy import func
             
             # Get all RFP types with project counts
@@ -2896,11 +3038,18 @@ def create_app():
             
             rfp_types = []
             for rfp_type, project_count in types:
+                # Get checklist template count for this RFP type
+                template_count = RFPChecklistTemplate.query.filter_by(
+                    rfp_type=rfp_type.type_name,
+                    is_active=True
+                ).count()
+                
                 type_data = {
                     'id': rfp_type.id,
                     'type_name': rfp_type.type_name,
                     'display_name': rfp_type.display_name,
                     'description': rfp_type.description,
+                    'template_count': template_count,
                     'default_workflow_stages': rfp_type.default_workflow_stages or [],
                     'is_active': rfp_type.is_active,
                     'project_count': project_count
@@ -3876,6 +4025,400 @@ def create_app():
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/documents/<int:document_id>/delete', methods=['DELETE'])
+    @api_login_required
+    def delete_document(document_id):
+        """Delete a document from a project"""
+        try:
+            from models import User, Document, Project
+            import os
+            
+            user = User.query.filter_by(username=session['username']).first()
+            document = Document.query.get(document_id)
+            
+            if not document:
+                return jsonify({'success': False, 'error': 'Document not found'}), 404
+            
+            # Get the project to verify ownership
+            project = Project.query.get(document.project_id)
+            if not project or project.user_id != user.id:
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            # Delete the physical file if it exists
+            if document.file_path and os.path.exists(document.file_path):
+                try:
+                    os.remove(document.file_path)
+                except OSError as e:
+                    print(f"Warning: Could not delete file {document.file_path}: {e}")
+            
+            # Remove from vector database if it exists
+            try:
+                from vector_store import VectorStore
+                vector_store = VectorStore()
+                vector_store.delete_document({
+                    'project_id': str(document.project_id),
+                    'document_id': str(document.id)
+                })
+            except Exception as e:
+                print(f"Warning: Could not remove document from vector store: {e}")
+            
+            # Delete from database
+            filename = document.original_filename or document.filename
+            db.session.delete(document)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Document "{filename}" deleted successfully'
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # ========================================
+    # RFP CHECKLIST SYSTEM ROUTES
+    # ========================================
+
+    @app.route('/admin/checklist-templates')
+    @login_required
+    def admin_checklist_templates():
+        """Admin page for managing checklist templates"""
+        try:
+            from models import User, RFPChecklistTemplate
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user or user.role != 'admin':
+                flash('Admin access required', 'error')
+                return redirect('/')
+            
+            # Get all checklist templates
+            templates = RFPChecklistTemplate.query.order_by(RFPChecklistTemplate.rfp_type, RFPChecklistTemplate.created_at.desc()).all()
+            
+            # Debug information
+            print(f"DEBUG: Loading checklist templates page")
+            print(f"  Total templates found: {len(templates)}")
+            for template in templates:
+                print(f"    - {template.name} ({template.rfp_type}) - Status: {template.parsing_status}")
+            
+            # Group by RFP type
+            templates_by_type = {}
+            for template in templates:
+                if template.rfp_type not in templates_by_type:
+                    templates_by_type[template.rfp_type] = []
+                templates_by_type[template.rfp_type].append(template)
+            
+            print(f"  Templates grouped by type: {list(templates_by_type.keys())}")
+            
+            return render_template('admin/checklist_templates.html', 
+                                 templates_by_type=templates_by_type,
+                                 total_templates=len(templates))
+            
+        except Exception as e:
+            flash(f'Error loading checklist templates: {e}', 'error')
+            return redirect('/admin')
+
+    @app.route('/admin/checklist-templates/upload', methods=['GET', 'POST'])
+    @login_required
+    def upload_checklist_template():
+        """Upload and configure new checklist template"""
+        try:
+            from models import User
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user or user.role != 'admin':
+                flash('Admin access required', 'error')
+                return redirect('/')
+            
+            if request.method == 'GET':
+                return render_template('admin/upload_checklist.html')
+            
+            # Handle POST - file upload
+            if 'excel_file' not in request.files:
+                return jsonify({'success': False, 'error': 'No file provided'})
+            
+            file = request.files['excel_file']
+            if file.filename == '':
+                return jsonify({'success': False, 'error': 'No file selected'})
+            
+            # Get form data
+            rfp_type = request.form.get('rfp_type', '').strip()
+            template_name = request.form.get('template_name', '').strip()
+            description = request.form.get('description', '').strip()
+            
+            if not rfp_type or not template_name:
+                return jsonify({'success': False, 'error': 'RFP type and template name are required'})
+            
+            # Save uploaded file
+            upload_dir = os.path.join(os.getcwd(), 'uploads', 'checklists')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{rfp_type}_{timestamp}_{file.filename}"
+            file_path = os.path.join(upload_dir, filename)
+            file.save(file_path)
+            
+            # Validate Excel file
+            from excel_processor import create_excel_processor
+            excel_processor = create_excel_processor()
+            
+            validation = excel_processor.validate_excel_file(file_path)
+            if not validation['valid']:
+                os.remove(file_path)  # Clean up
+                return jsonify({'success': False, 'error': validation['error']})
+            
+            # Preview sheets for column mapping
+            preview = excel_processor.preview_excel_sheets(file_path, max_preview_rows=5)
+            if not preview['success']:
+                os.remove(file_path)  # Clean up
+                return jsonify({'success': False, 'error': preview['error']})
+            
+            # Create template record
+            from models import RFPChecklistTemplate
+            template = RFPChecklistTemplate(
+                rfp_type=rfp_type,
+                name=template_name,
+                description=description,
+                original_filename=file.filename,
+                file_path=file_path,
+                file_size=validation['file_size'],
+                file_hash=excel_processor._calculate_file_hash(file_path),
+                parsing_status='pending',
+                created_by=user.id
+            )
+            
+            db.session.add(template)
+            db.session.commit()
+            
+            # Return preview data for column mapping
+            return jsonify({
+                'success': True,
+                'template_id': template.checklist_id,
+                'preview': preview,
+                'next_step': 'column_mapping'
+            })
+            
+        except Exception as e:
+            print(f"Template upload error: {e}")
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/admin/checklist-templates/<template_id>/configure', methods=['GET', 'POST'])
+    @login_required
+    def configure_checklist_template(template_id):
+        """Configure column mappings for uploaded template"""
+        try:
+            from models import User, RFPChecklistTemplate
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user or user.role != 'admin':
+                flash('Admin access required', 'error')
+                return redirect('/')
+            
+            template = RFPChecklistTemplate.query.filter_by(checklist_id=template_id).first()
+            if not template:
+                return jsonify({'success': False, 'error': 'Template not found'})
+            
+            if request.method == 'GET':
+                # Load preview data for configuration
+                from excel_processor import create_excel_processor
+                excel_processor = create_excel_processor()
+                
+                preview = excel_processor.preview_excel_sheets(template.file_path)
+                if not preview['success']:
+                    return jsonify({'success': False, 'error': preview['error']})
+                
+                # Get suggested column mappings
+                suggestions = excel_processor.get_suggested_column_mappings(preview)
+                
+                return render_template('admin/configure_checklist.html',
+                                     template=template,
+                                     preview=preview,
+                                     suggestions=suggestions.get('suggestions', {}))
+            
+            # Handle POST - save configuration
+            sheets_config = request.json.get('sheets_config', {})
+            
+            if not sheets_config:
+                return jsonify({'success': False, 'error': 'No sheet configuration provided'})
+            
+            # Parse checklist items
+            from excel_processor import create_excel_processor
+            excel_processor = create_excel_processor()
+            
+            parsing_result = excel_processor.parse_checklist_from_excel(template.file_path, sheets_config)
+            
+            if not parsing_result['success']:
+                return jsonify({'success': False, 'error': parsing_result['error']})
+            
+            # Save checklist items
+            from models import ChecklistItem
+            
+            for item_data in parsing_result['items']:
+                checklist_item = ChecklistItem(
+                    checklist_id=template.checklist_id,
+                    sheet_name=item_data.get('sheet_name'),
+                    row_number=item_data.get('row_number'),
+                    excel_reference=item_data.get('excel_reference'),
+                    section=item_data.get('section', ''),
+                    category=item_data.get('category', ''),
+                    question_text=item_data.get('question_text', ''),
+                    requirement_type=item_data.get('requirement_type', 'general'),
+                    priority=item_data.get('priority', 'medium'),
+                    mandatory=item_data.get('mandatory', False),
+                    expected_response_type=item_data.get('expected_response_type', 'text'),
+                    display_order=item_data.get('display_order', 0)
+                )
+                db.session.add(checklist_item)
+            
+            # Update template
+            template.sheets_config = sheets_config
+            template.total_questions = parsing_result['total_items']
+            template.parsing_status = 'completed' if parsing_result['success'] else 'failed'
+            template.parsing_errors = parsing_result.get('parsing_errors', [])
+            template.updated_by = user.id
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'items_parsed': parsing_result['total_items'],
+                'parsing_errors': parsing_result.get('parsing_errors', [])
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Template configuration error: {e}")
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/checklist-templates/<template_id>/validate-project/<project_id>', methods=['POST'])
+    @api_login_required
+    def validate_project_against_checklist(template_id, project_id):
+        """Validate a project against a checklist template"""
+        try:
+            from models import User
+            
+            user = User.query.filter_by(username=session['username']).first()
+            
+            # Initialize validation engine
+            from checklist_validation_engine import create_validation_engine
+            validation_engine = create_validation_engine()
+            
+            # Run validation
+            result = validation_engine.validate_rfp_against_checklist(
+                project_id=project_id,
+                checklist_template_id=template_id,
+                user_id=user.id
+            )
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"Checklist validation error: {e}")
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/checklist-templates/<template_id>/delete', methods=['DELETE'])
+    @login_required
+    def delete_checklist_template(template_id):
+        """Delete a checklist template"""
+        try:
+            from models import User, RFPChecklistTemplate, ChecklistItem, RFPChecklistValidation, ChecklistItemValidation, ClarificationRequest
+            
+            user = User.query.filter_by(username=session['username']).first()
+            if not user or user.role != 'admin':
+                return jsonify({'success': False, 'error': 'Admin access required'}), 403
+            
+            # Get the template
+            template = RFPChecklistTemplate.query.filter_by(checklist_id=template_id).first()
+            if not template:
+                return jsonify({'success': False, 'error': 'Template not found'}), 404
+            
+            # Check if template is marked as default
+            if template.is_default:
+                return jsonify({'success': False, 'error': 'Cannot delete default template'}), 400
+            
+            try:
+                # Delete in correct order to handle foreign key constraints
+                
+                # 1. Delete clarification requests first (references checklist items)
+                ClarificationRequest.query.filter_by(
+                    item_id=ChecklistItem.item_id
+                ).filter(
+                    ChecklistItem.checklist_id == template_id
+                ).delete(synchronize_session=False)
+                
+                # 2. Delete checklist item validations (references both checklist items and validations)
+                ChecklistItemValidation.query.filter_by(
+                    item_id=ChecklistItem.item_id
+                ).filter(
+                    ChecklistItem.checklist_id == template_id  
+                ).delete(synchronize_session=False)
+                
+                # 3. Delete RFP checklist validations (references template)
+                RFPChecklistValidation.query.filter_by(checklist_id=template_id).delete()
+                
+                # 4. Delete checklist items (references template)
+                ChecklistItem.query.filter_by(checklist_id=template_id).delete()
+                
+                # 5. Delete the template file if it exists
+                if template.file_path and os.path.exists(template.file_path):
+                    try:
+                        os.remove(template.file_path)
+                        print(f"Deleted template file: {template.file_path}")
+                    except Exception as e:
+                        print(f"Warning: Could not delete template file {template.file_path}: {e}")
+                
+                # 6. Finally delete the template itself
+                db.session.delete(template)
+                
+                # Commit all changes
+                db.session.commit()
+                
+                print(f"Successfully deleted checklist template: {template.name} ({template_id})")
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f'Template "{template.name}" and all associated data deleted successfully'
+                })
+                
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error during template deletion: {e}")
+                return jsonify({'success': False, 'error': f'Database error during deletion: {str(e)}'}), 500
+                
+        except Exception as e:
+            print(f"Delete checklist template error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/project/<project_id>/checklist-validation')
+    @login_required
+    def project_checklist_validation(project_id):
+        """View checklist validation results for a project"""
+        try:
+            from models import User, Project, RFPChecklistValidation, RFPChecklistTemplate
+            
+            user = User.query.filter_by(username=session['username']).first()
+            project = Project.query.filter_by(id=project_id, user_id=user.id).first_or_404()
+            
+            # Get validation results
+            validations = RFPChecklistValidation.query.filter_by(project_id=project_id).order_by(RFPChecklistValidation.validation_date.desc()).all()
+            
+            # Get available templates for this RFP type
+            available_templates = RFPChecklistTemplate.query.filter_by(
+                rfp_type=project.rfp_type,
+                is_active=True,
+                parsing_status='completed'
+            ).all()
+            
+            return render_template('project/checklist_validation.html',
+                                 project=project,
+                                 validations=validations,
+                                 available_templates=available_templates)
+            
+        except Exception as e:
+            flash(f'Error loading checklist validation: {e}', 'error')
+            return redirect(f'/project/{project_id}')
 
     return app
 

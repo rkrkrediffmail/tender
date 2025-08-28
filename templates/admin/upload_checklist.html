@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Checklist Template - Admin</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+            font-size: 13px;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .btn {
+            font-size: 12px;
+            padding: 8px 16px;
+            border-radius: 6px;
+        }
+        .btn-primary {
+            background: #1F4397;
+            border: none;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 42px;
+            text-align: center;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        .upload-area.drag-over {
+            border-color: #1F4397;
+            background: #e7f3ff;
+        }
+        .upload-area:hover {
+            border-color: #1F4397;
+        }
+        .form-label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 13px;
+        }
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+        .step {
+            text-align: center;
+            flex: 1;
+            position: relative;
+        }
+        .step.active .step-circle {
+            background: #1F4397;
+            color: white;
+        }
+        .step.completed .step-circle {
+            background: #28a745;
+            color: white;
+        }
+        .step-circle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .step-title {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .step.active .step-title {
+            color: #1F4397;
+            font-weight: 500;
+        }
+        .requirements-list {
+            background: #f8f9fa;
+            padding: 17px;
+            border-radius: 8px;
+            margin-bottom: 17px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Common Navigation -->
+    {% include 'common_navbar.html' %}
+
+    <div class="container mt-4" style="max-width: 800px;">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="fas fa-upload me-2"></i>Upload Checklist Template</h2>
+                <p class="text-muted">Upload Excel checklist template for RFP validation</p>
+            </div>
+            <a href="/admin/checklist-templates" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Templates
+            </a>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <div class="step active" id="step1">
+                <div class="step-circle">1</div>
+                <div class="step-title">Upload & Details</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-circle">2</div>
+                <div class="step-title">Column Mapping</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-circle">3</div>
+                <div class="step-title">Review & Save</div>
+            </div>
+        </div>
+
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-file-excel me-2"></i>Excel Template Upload</h5>
+            </div>
+            <div class="card-body">
+                <!-- Requirements -->
+                <div class="requirements-list">
+                    <h6><i class="fas fa-info-circle me-2"></i>Template Requirements</h6>
+                    <ul class="mb-0">
+                        <li>Excel file (.xlsx, .xls, .xlsm) format</li>
+                        <li>Maximum file size: 50MB</li>
+                        <li>At least one column containing questions/requirements</li>
+                        <li>Consistent structure across all data rows</li>
+                        <li>Optional: Priority, Section, Category columns for better organization</li>
+                    </ul>
+                </div>
+
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <!-- RFP Type Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="rfp_type">RFP Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="rfp_type" name="rfp_type" required>
+                                <option value="">Select RFP Type</option>
+                                <option value="upgrade">Upgrade</option>
+                                <option value="implementation">Implementation</option>
+                                <option value="migration">Migration</option>
+                                <option value="integration">Integration</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="consulting">Consulting</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <small class="text-muted">This template will be used for this type of RFP</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="template_name">Template Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="template_name" name="template_name" 
+                                   placeholder="e.g., T24 Upgrade Checklist v2.3" required>
+                            <small class="text-muted">Descriptive name for this checklist</small>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label class="form-label" for="description">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" 
+                                  placeholder="Brief description of what this checklist covers..."></textarea>
+                    </div>
+
+                    <!-- File Upload Area -->
+                    <div class="mb-4">
+                        <label class="form-label">Excel Template File <span class="text-danger">*</span></label>
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h5>Drag & Drop Excel File Here</h5>
+                            <p class="text-muted">or <a href="#" id="browseFiles">browse files</a></p>
+                            <input type="file" id="excel_file" name="excel_file" accept=".xlsx,.xls,.xlsm" style="display: none;" required>
+                        </div>
+                        
+                        <!-- File Info -->
+                        <div id="fileInfo" class="mt-3" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-excel text-success me-2"></i>
+                                <span id="fileName"></span>
+                                <span id="fileSize" class="text-muted ms-2"></span>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="removeFile">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div id="uploadProgress" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted mt-1 d-block" id="progressText">Uploading...</small>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-outline-secondary me-2" onclick="history.back()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                            <i class="fas fa-upload me-1"></i>Upload & Configure
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('excel_file');
+        const browseLink = document.getElementById('browseFiles');
+        const fileInfo = document.getElementById('fileInfo');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadProgress = document.getElementById('uploadProgress');
+
+        // File upload handling
+        browseLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelection();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelection);
+
+        function handleFileSelection() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // Validate file type
+            const allowedTypes = ['.xlsx', '.xls', '.xlsm'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedTypes.includes(fileExt)) {
+                alert('Please select a valid Excel file (.xlsx, .xls, or .xlsm)');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validate file size (50MB)
+            if (file.size > 50 * 1024 * 1024) {
+                alert('File size must be less than 50MB');
+                fileInput.value = '';
+                return;
+            }
+
+            // Display file info
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = `(${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+            fileInfo.style.display = 'block';
+            uploadArea.style.display = 'none';
+
+            // Enable upload button
+            updateUploadButton();
+        }
+
+        // Remove file
+        document.getElementById('removeFile').addEventListener('click', () => {
+            fileInput.value = '';
+            fileInfo.style.display = 'none';
+            uploadArea.style.display = 'block';
+            updateUploadButton();
+        });
+
+        function updateUploadButton() {
+            const rfpType = document.getElementById('rfp_type').value;
+            const templateName = document.getElementById('template_name').value;
+            const hasFile = fileInput.files.length > 0;
+
+            uploadBtn.disabled = !(rfpType && templateName && hasFile);
+        }
+
+        // Form validation
+        document.getElementById('rfp_type').addEventListener('change', updateUploadButton);
+        document.getElementById('template_name').addEventListener('input', updateUploadButton);
+
+        // Form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(uploadForm);
+            
+            // Show progress
+            uploadProgress.style.display = 'block';
+            uploadBtn.disabled = true;
+
+            try {
+                const response = await fetch('/admin/checklist-templates/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update step indicator
+                    document.getElementById('step1').classList.remove('active');
+                    document.getElementById('step1').classList.add('completed');
+                    document.getElementById('step2').classList.add('active');
+
+                    // Proceed to column mapping
+                    window.location.href = `/admin/checklist-templates/${result.template_id}/configure`;
+                } else {
+                    alert('Upload failed: ' + result.error);
+                    uploadProgress.style.display = 'none';
+                    uploadBtn.disabled = false;
+                }
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+                uploadProgress.style.display = 'none';
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // Check for pre-selected RFP type from URL parameters
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const preSelectedRfpType = urlParams.get('rfp_type');
+            
+            if (preSelectedRfpType) {
+                document.getElementById('rfp_type').value = preSelectedRfpType;
+                
+                // Auto-generate template name
+                const nameField = document.getElementById('template_name');
+                if (!nameField.value) {
+                    const suggestions = {
+                        'upgrade': 'T24 Upgrade Checklist',
+                        'implementation': 'Core Banking Implementation Checklist',
+                        'migration': 'Data Migration Checklist',
+                        'integration': 'API Integration Checklist',
+                        'maintenance': 'System Maintenance Checklist',
+                        'consulting': 'BFSI Consulting Checklist'
+                    };
+                    nameField.value = suggestions[preSelectedRfpType] || `${preSelectedRfpType.charAt(0).toUpperCase() + preSelectedRfpType.slice(1)} Checklist`;
+                    updateUploadButton();
+                }
+            }
+        });
+
+        // Auto-generate template name based on RFP type
+        document.getElementById('rfp_type').addEventListener('change', function() {
+            const nameField = document.getElementById('template_name');
+            if (!nameField.value) {
+                const rfpType = this.value;
+                if (rfpType) {
+                    const suggestions = {
+                        'upgrade': 'T24 Upgrade Checklist',
+                        'implementation': 'Core Banking Implementation Checklist',
+                        'migration': 'Data Migration Checklist',
+                        'integration': 'API Integration Checklist',
+                        'maintenance': 'System Maintenance Checklist',
+                        'consulting': 'BFSI Consulting Checklist'
+                    };
+                    nameField.value = suggestions[rfpType] || `${rfpType.charAt(0).toUpperCase() + rfpType.slice(1)} Checklist`;
+                    updateUploadButton();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

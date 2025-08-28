@@ -1166,7 +1166,7 @@ Note: AI analysis service not available. This is a basic template. Please config
         return "\n".join(formatted)
 
     def _get_past_proposal_insights(self, proposal_type: str) -> Dict[str, Any]:
-        """Get relevant past proposal insights for the current proposal type"""
+        """Get enhanced past proposal insights using Claude Vector Intelligence"""
         try:
             from proposal_manager import get_proposal_manager
             
@@ -1184,49 +1184,99 @@ Note: AI analysis service not available. This is a basic template. Please config
             return {'success': False, 'error': str(e)}
     
     def _format_past_proposal_context(self, insights: Dict[str, Any]) -> str:
-        """Format past proposal insights for inclusion in AI prompt"""
-        if not insights.get('success') or not insights.get('reusable_content'):
+        """Format enhanced past proposal insights from Claude Vector Intelligence"""
+        if not insights.get('success'):
             return ""
         
         context_parts = [
-            "\n**RELEVANT PAST PROPOSAL INSIGHTS:**",
-            f"**Confidence Score:** {insights.get('confidence_score', 0):.0%}",
-            f"**Found Proposals:** {insights.get('found_proposals', 0)} relevant past proposals"
+            "\n**🎯 CLAUDE VECTOR INTELLIGENCE - PAST PROPOSAL INSIGHTS:**",
+            f"**Intelligence Score:** {insights.get('confidence_score', 0):.0%}",
+            f"**Analyzed Sources:** {insights.get('found_proposals', 0)} relevant past proposals",
+            f"**Generated:** {insights.get('intelligence_timestamp', 'Unknown')}"
         ]
         
+        # Reusable content sections with enhanced intelligence
         reusable_content = insights.get('reusable_content', {})
         
-        # Add technical approach examples
         if reusable_content.get('technical_approach'):
-            context_parts.append("\n**Past Technical Approaches:**")
-            for i, content in enumerate(reusable_content['technical_approach'][:2], 1):
-                context_parts.append(f"Example {i}: {content['content'][:400]}...")
+            tech_approach = reusable_content['technical_approach']
+            context_parts.extend([
+                "\n**🔧 PROVEN TECHNICAL APPROACHES:**",
+                f"Content: {tech_approach.get('content', '')[:400]}...",
+                f"Adaptation Needed: {tech_approach.get('adaptation_needed', 'Standard customization')}",
+                f"Confidence: {tech_approach.get('confidence', 0):.0%}",
+                f"Source Proposals: {', '.join(tech_approach.get('source_proposals', []))}"
+            ])
         
-        # Add implementation methodology examples
         if reusable_content.get('implementation_methodology'):
-            context_parts.append("\n**Past Implementation Methodologies:**")
-            for i, content in enumerate(reusable_content['implementation_methodology'][:2], 1):
-                context_parts.append(f"Approach {i}: {content['content'][:400]}...")
+            impl_method = reusable_content['implementation_methodology']
+            context_parts.extend([
+                "\n**⚙️ PROVEN IMPLEMENTATION METHODOLOGIES:**",
+                f"Content: {impl_method.get('content', '')[:400]}...",
+                f"Adaptation Needed: {impl_method.get('adaptation_needed', 'Standard customization')}",
+                f"Confidence: {impl_method.get('confidence', 0):.0%}"
+            ])
         
-        # Add team expertise examples
-        if reusable_content.get('team_expertise'):
-            context_parts.append("\n**Past Team Expertise Examples:**")
-            for i, content in enumerate(reusable_content['team_expertise'][:2], 1):
-                context_parts.append(f"Experience {i}: {content['content'][:400]}...")
+        if reusable_content.get('team_experience'):
+            team_exp = reusable_content['team_experience']
+            context_parts.extend([
+                "\n**👥 TEAM EXPERIENCE FROM PAST PROPOSALS:**",
+                f"Content: {team_exp.get('content', '')[:400]}...",
+                f"Adaptation Needed: {team_exp.get('adaptation_needed', 'Update for current project')}",
+                f"Confidence: {team_exp.get('confidence', 0):.0%}"
+            ])
         
-        # Add recommendations
-        recommendations = insights.get('recommendations', [])
-        if recommendations:
-            context_parts.append("\n**Usage Recommendations:**")
-            for rec in recommendations[:3]:
-                context_parts.append(f"• {rec.get('section', '')}: {rec.get('recommendation', '')}")
+        if reusable_content.get('solution_architecture'):
+            sol_arch = reusable_content['solution_architecture']
+            context_parts.extend([
+                "\n**🏗️ SOLUTION ARCHITECTURE PATTERNS:**",
+                f"Content: {sol_arch.get('content', '')[:400]}...",
+                f"Adaptation Needed: {sol_arch.get('adaptation_needed', 'Customize for requirements')}",
+                f"Confidence: {sol_arch.get('confidence', 0):.0%}"
+            ])
         
-        context_parts.append("\n**Instructions:** Leverage the above past proposal examples to:")
-        context_parts.append("1. Adapt proven successful approaches to current requirements")
-        context_parts.append("2. Use similar language and structure where appropriate")
-        context_parts.append("3. Build on successful technical solutions from past wins")
-        context_parts.append("4. Ensure all content is properly customized for the current RFP")
-        context_parts.append("")
+        # Capability Intelligence
+        capability_intel = insights.get('capability_intelligence', {})
+        if capability_intel:
+            context_parts.append("\n**💪 OUR PROVEN CAPABILITIES:**")
+            if capability_intel.get('proven_capabilities'):
+                context_parts.append(f"Capabilities: {', '.join(capability_intel['proven_capabilities'][:5])}")
+            if capability_intel.get('technology_expertise'):
+                context_parts.append(f"Technologies: {', '.join(capability_intel['technology_expertise'][:5])}")
+            if capability_intel.get('competitive_differentiators'):
+                context_parts.append(f"Differentiators: {', '.join(capability_intel['competitive_differentiators'][:3])}")
+        
+        # Gap Analysis
+        gap_analysis = insights.get('gap_analysis', {})
+        if gap_analysis:
+            context_parts.append("\n**⚠️ GAP ANALYSIS:**")
+            if gap_analysis.get('missing_capabilities'):
+                context_parts.append(f"New Capabilities Needed: {', '.join(gap_analysis['missing_capabilities'][:3])}")
+            if gap_analysis.get('research_needed'):
+                context_parts.append(f"Research Required: {', '.join(gap_analysis['research_needed'][:3])}")
+        
+        # Generation Guidance
+        generation_guidance = insights.get('generation_guidance', {})
+        if generation_guidance:
+            context_parts.append("\n**📝 GENERATION GUIDANCE:**")
+            if generation_guidance.get('writing_style'):
+                context_parts.append(f"Style: {generation_guidance['writing_style']}")
+            if generation_guidance.get('key_messaging'):
+                context_parts.append(f"Key Messages: {', '.join(generation_guidance['key_messaging'][:3])}")
+            if generation_guidance.get('success_factors'):
+                context_parts.append(f"Success Factors: {', '.join(generation_guidance['success_factors'][:3])}")
+        
+        context_parts.extend([
+            "\n**🤖 CLAUDE GENERATION INSTRUCTIONS:**",
+            "1. LEVERAGE proven technical approaches with appropriate adaptation",
+            "2. REFERENCE similar past implementations where highly relevant", 
+            "3. EMPHASIZE our proven capabilities and competitive differentiators",
+            "4. ADDRESS any capability gaps with mitigation strategies",
+            "5. MAINTAIN consistency with our established expertise and success patterns",
+            "6. CUSTOMIZE all content to align perfectly with current RFP requirements",
+            "7. USE the provided writing style and key messaging themes",
+            "\n**🎯 INTELLIGENCE SYNTHESIS COMPLETE - USE FOR COMPETITIVE ADVANTAGE**\n"
+        ])
         
         return "\n".join(context_parts)
 

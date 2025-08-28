@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Checklist Validation - {{ project.name }}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f8f9fa;
+            font-size: 13px;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1F4397 0%, #10224c 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 17px;
+        }
+        .btn {
+            font-size: 12px;
+            padding: 8px 16px;
+            border-radius: 6px;
+        }
+        .btn-primary {
+            background: #1F4397;
+            border: none;
+        }
+        .validation-summary {
+            background: linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        .metric-box {
+            text-align: center;
+            padding: 17px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 21px;
+            font-weight: bold;
+            color: #1F4397;
+        }
+        .metric-label {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .progress-custom {
+            height: 12px;
+            border-radius: 6px;
+            background: #e9ecef;
+        }
+        .progress-bar-custom {
+            border-radius: 6px;
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        }
+        .status-addressed { color: #28a745; }
+        .status-partial { color: #ffc107; }
+        .status-missing { color: #dc3545; }
+        .status-unclear { color: #6c757d; }
+        .validation-item {
+            padding: 12px 17px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        .validation-item:hover {
+            background: #f8f9fa;
+        }
+        .validation-item:last-child {
+            border-bottom: none;
+        }
+        .template-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 17px;
+            margin-bottom: 17px;
+        }
+        .clarification-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: #fff3cd;
+            color: #856404;
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Include Common Navigation -->
+    {% include 'common_navbar.html' %}
+
+    <div class="container-fluid mt-4">
+        <!-- Include Project Breadcrumb -->
+        {% set current_page = "Checklist Validation" %}
+        {% include 'project_breadcrumb.html' %}
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="fas fa-list-check me-2"></i>Checklist Validation</h2>
+                <p class="text-muted">{{ project.name }} - Automated compliance checking against ITSS methodology</p>
+            </div>
+            <div>
+                <a href="/project/{{ project.id }}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Project
+                </a>
+                {% if available_templates %}
+                <button class="btn btn-success" onclick="showRunValidation()">
+                    <i class="fas fa-play me-1"></i>Run New Validation
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not available_templates %}
+            <!-- No Templates Available -->
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                    <h4>No Checklist Templates Available</h4>
+                    <p class="text-muted">
+                        No checklist templates are available for <strong>{{ project.rfp_type.title() }}</strong> projects.<br>
+                        Contact your administrator to upload a checklist template for this RFP type.
+                    </p>
+                    <a href="/admin/checklist-templates" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-cog me-2"></i>Manage Templates (Admin)
+                    </a>
+                </div>
+            </div>
+        {% else %}
+            <!-- Template Selector (Initially Hidden) -->
+            <div class="template-selector" id="templateSelector" style="display: none;">
+                <h5><i class="fas fa-clipboard-list me-2"></i>Select Checklist Template</h5>
+                <div class="row">
+                    {% for template in available_templates %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ template.name }}</h6>
+                                        <small class="text-muted">{{ template.description or 'No description' }}</small>
+                                        <div class="mt-2">
+                                            <span class="badge bg-light text-dark">{{ template.total_questions }} questions</span>
+                                            <span class="badge bg-info">v{{ template.version }}</span>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm" onclick="runValidation('{{ template.checklist_id }}')">
+                                        <i class="fas fa-play me-1"></i>Select
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="text-end mt-3">
+                    <button class="btn btn-outline-secondary" onclick="hideRunValidation()">Cancel</button>
+                </div>
+            </div>
+
+            {% if validations %}
+                <!-- Validation Results -->
+                {% for validation in validations %}
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="fas fa-calendar-check me-2"></i>
+                                {{ validation.template.name }}
+                            </h5>
+                            <small class="text-muted">
+                                Validated on {{ validation.validation_date.strftime('%B %d, %Y at %I:%M %p') if validation.validation_date else 'Unknown' }}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            {% if validation.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                                <div class="dropdown d-inline-block ms-2">
+                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i class="fas fa-download me-1"></i>Export
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="exportExcel('{{ validation.validation_id }}')">
+                                            <i class="fas fa-file-excel me-2"></i>Filled Checklist (Excel)
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="exportClarifications('{{ validation.validation_id }}')">
+                                            <i class="fas fa-question-circle me-2"></i>Clarification Sheet
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="exportReport('{{ validation.validation_id }}')">
+                                            <i class="fas fa-file-pdf me-2"></i>Validation Report
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            {% elif validation.status == 'processing' %}
+                                <span class="badge bg-warning">
+                                    <i class="spinner-border spinner-border-sm me-1"></i>Processing
+                                </span>
+                            {% elif validation.status == 'failed' %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if validation.status == 'completed' %}
+                    <div class="card-body">
+                        <!-- Validation Summary -->
+                        <div class="validation-summary">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="metric-box">
+                                        <div class="metric-value">{{ "%.1f"|format(validation.overall_completion_percentage) }}%</div>
+                                        <div class="metric-label">Overall Completion</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-box">
+                                        <div class="metric-value status-addressed">{{ validation.addressed_items }}</div>
+                                        <div class="metric-label">Addressed</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-box">
+                                        <div class="metric-value status-partial">{{ validation.partial_items }}</div>
+                                        <div class="metric-label">Partial</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-box">
+                                        <div class="metric-value status-missing">{{ validation.missing_items }}</div>
+                                        <div class="metric-label">Missing</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Progress Bar -->
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span><strong>Validation Progress</strong></span>
+                                    <span>{{ validation.addressed_items + validation.partial_items }} / {{ validation.total_items }} items</span>
+                                </div>
+                                <div class="progress-custom">
+                                    <div class="progress-bar-custom" style="width: {{ validation.overall_completion_percentage }}%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Stats -->
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <small class="text-muted">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        High Priority: {{ "%.1f"|format(validation.high_priority_completion) }}% complete
+                                    </small>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted">
+                                        <i class="fas fa-star me-1"></i>
+                                        Mandatory: {{ "%.1f"|format(validation.mandatory_completion) }}% complete
+                                    </small>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Processed in {{ "%.1f"|format(validation.processing_time_seconds) }}s
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-info btn-sm me-2" onclick="viewValidationDetails('{{ validation.validation_id }}')">
+                                    <i class="fas fa-eye me-1"></i>View Details
+                                </button>
+                                {% if validation.clarification_requests %}
+                                <button class="btn btn-outline-warning btn-sm" onclick="viewClarifications('{{ validation.validation_id }}')">
+                                    <i class="fas fa-question-circle me-1"></i>
+                                    Clarifications ({{ validation.clarification_requests|length }})
+                                </button>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <small class="text-muted">
+                                    AI Model: {{ validation.ai_model_used or 'N/A' }}
+                                    {% if validation.total_tokens_used %}
+                                    | {{ validation.total_tokens_used }} tokens
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Validation Details (Initially Hidden) -->
+                        <div id="validationDetails{{ validation.validation_id }}" style="display: none;">
+                            <hr>
+                            <h6><i class="fas fa-list me-2"></i>Item Validation Results</h6>
+                            <div class="row">
+                                <div class="col-12" style="max-height: 400px; overflow-y: auto;">
+                                    <!-- Validation items would be loaded here via AJAX -->
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm me-2"></div>
+                                        Loading validation details...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% elif validation.status == 'failed' %}
+                    <div class="card-body">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Validation Failed:</strong> {{ validation.error_message or 'Unknown error occurred' }}
+                        </div>
+                        <button class="btn btn-warning btn-sm" onclick="retryValidation('{{ validation.validation_id }}')">
+                            <i class="fas fa-redo me-1"></i>Retry Validation
+                        </button>
+                    </div>
+                    {% elif validation.status == 'processing' %}
+                    <div class="card-body">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary me-2"></div>
+                            <span>Validation in progress... This may take a few minutes.</span>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="checkValidationStatus('{{ validation.validation_id }}')">
+                                <i class="fas fa-sync me-1"></i>Check Status
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- No Validations Yet -->
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-list-check fa-3x text-muted mb-3"></i>
+                        <h4>No Validations Run</h4>
+                        <p class="text-muted">
+                            Run your first checklist validation to ensure RFP compliance<br>
+                            against ITSS Global's proven methodologies for {{ project.rfp_type.title() }} projects.
+                        </p>
+                        <button class="btn btn-success" onclick="showRunValidation()">
+                            <i class="fas fa-play me-2"></i>Run First Validation
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <!-- Validation Progress Modal -->
+    <div class="modal fade" id="validationProgressModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-cog fa-spin me-2"></i>Running Validation
+                    </h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3"></div>
+                    <p>Analyzing your RFP documents against the selected checklist...</p>
+                    <small class="text-muted">This process may take 2-5 minutes depending on document complexity.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showRunValidation() {
+            document.getElementById('templateSelector').style.display = 'block';
+        }
+
+        function hideRunValidation() {
+            document.getElementById('templateSelector').style.display = 'none';
+        }
+
+        async function runValidation(templateId) {
+            // Show progress modal
+            const modal = new bootstrap.Modal(document.getElementById('validationProgressModal'));
+            modal.show();
+
+            hideRunValidation();
+
+            try {
+                const response = await fetch(`/api/checklist-templates/${templateId}/validate-project/{{ project.id }}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                const result = await response.json();
+
+                modal.hide();
+
+                if (result.success) {
+                    alert(`Validation completed successfully!\n\nStats:\n- Total items: ${result.stats.addressed + result.stats.missing + result.stats.partial + result.stats.unclear}\n- Addressed: ${result.stats.addressed}\n- Missing: ${result.stats.missing}\n- Completion: ${result.stats.completion_percentage.toFixed(1)}%`);
+                    window.location.reload();
+                } else {
+                    alert('Validation failed: ' + result.error);
+                }
+            } catch (error) {
+                modal.hide();
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        function viewValidationDetails(validationId) {
+            const detailsDiv = document.getElementById('validationDetails' + validationId);
+            if (detailsDiv.style.display === 'none') {
+                // Load and show details
+                loadValidationDetails(validationId);
+                detailsDiv.style.display = 'block';
+            } else {
+                detailsDiv.style.display = 'none';
+            }
+        }
+
+        async function loadValidationDetails(validationId) {
+            try {
+                const response = await fetch(`/api/checklist-validation/${validationId}/details`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Build details HTML
+                    let html = '<div class="validation-items">';
+                    data.items.forEach(item => {
+                        const statusClass = `status-${item.status.toLowerCase()}`;
+                        html += `
+                            <div class="validation-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div style="flex: 1;">
+                                        <h6 class="mb-1">${item.question_text}</h6>
+                                        <small class="text-muted">${item.section || 'General'} > ${item.category || 'N/A'}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-light text-dark ${statusClass}">${item.status}</span>
+                                        ${item.needs_clarification ? '<span class="clarification-badge ms-1">Needs Clarification</span>' : ''}
+                                    </div>
+                                </div>
+                                ${item.extracted_content ? `<div class="mt-2"><small class="text-success"><strong>Found:</strong> ${item.extracted_content.substring(0, 200)}...</small></div>` : ''}
+                                ${item.ai_reasoning ? `<div class="mt-1"><small class="text-muted"><strong>Analysis:</strong> ${item.ai_reasoning}</small></div>` : ''}
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+
+                    document.querySelector('#validationDetails' + validationId + ' .col-12').innerHTML = html;
+                } else {
+                    document.querySelector('#validationDetails' + validationId + ' .col-12').innerHTML = 
+                        '<div class="alert alert-danger">Failed to load validation details</div>';
+                }
+            } catch (error) {
+                document.querySelector('#validationDetails' + validationId + ' .col-12').innerHTML = 
+                    '<div class="alert alert-danger">Error loading details: ' + error.message + '</div>';
+            }
+        }
+
+        function exportExcel(validationId) {
+            window.open(`/api/checklist-validation/${validationId}/export/excel`);
+        }
+
+        function exportClarifications(validationId) {
+            window.open(`/api/checklist-validation/${validationId}/export/clarifications`);
+        }
+
+        function exportReport(validationId) {
+            window.open(`/api/checklist-validation/${validationId}/export/report`);
+        }
+
+        function viewClarifications(validationId) {
+            window.open(`/project/{{ project.id }}/clarifications/${validationId}`);
+        }
+
+        function checkValidationStatus(validationId) {
+            window.location.reload();
+        }
+
+        // Auto-refresh page if there are processing validations
+        {% if validations %}
+        {% for validation in validations %}
+        {% if validation.status == 'processing' %}
+        setTimeout(() => {
+            window.location.reload();
+        }, 30000); // Refresh every 30 seconds
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+    </script>
+</body>
+</html>

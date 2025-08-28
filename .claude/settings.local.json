@@ -11,7 +11,14 @@
       "Bash(grep:*)",
       "WebFetch(domain:www.itssglobal.com)",
       "Bash(rm:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(pip install:*)",
+      "Bash(apt list:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(pip3 list:*)",
+      "Bash(source:*)",
+      "Bash(sudo chmod:*)"
     ],
     "deny": [],
     "ask": []

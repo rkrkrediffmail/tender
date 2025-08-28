@@ -66,10 +66,11 @@ numpy==1.24.3
 # File handling
 filetype==1.2.0
 
-# Azure integration
+# Azure integration (Enhanced for ephemeral storage)
 azure-identity==1.15.0
 azure-storage-blob==12.19.0
 azure-keyvault-secrets==4.7.0
+azure-core>=1.29.0
 
 # Caching (lightweight - no Redis needed)
 flask-caching==2.1.0
