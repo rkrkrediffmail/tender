@@ -82,7 +82,7 @@ flask-healthz
 flask-limiter==3.5.0
 reportlab
 # Input validation
-marshmallow==3.20.1
+marshmallow==3.26.2
 
 # Development and testing
 pytest==7.4.3
