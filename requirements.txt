@@ -27,7 +27,7 @@ Pillow==10.2.0  # Image processing - needed for document processor
 reportlab==4.0.7  # Lightweight PDF generation for analysis reports
 
 # Security and utilities (Latest)
-Werkzeug==3.0.1
+Werkzeug==3.1.5
 bcrypt==4.1.2
 cryptography==42.0.2
 PyJWT==2.8.0
